@@ -413,7 +413,7 @@ server <- function(input, output, session) {
     
     validate(need(nrow(tbl) > 0,
                   paste0("'", g, "' not found in DEG results.")))
-
+    
     
     # Display table
     datatable(
