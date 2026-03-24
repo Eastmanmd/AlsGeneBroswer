@@ -246,7 +246,7 @@ ui <- fluidPage(
                 div(class = "stat-chip", "padj < 0.05"),
                 div(class = "stat-chip", "|log\u2082FC| > 1")
             ),
-            
+
             div(class = "sidebar-section",
                 tags$span(class = "sidebar-label", "Status"),
                 uiOutput("data_status")
