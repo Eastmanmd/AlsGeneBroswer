@@ -221,7 +221,7 @@ app_css <- sprintf("
   }
   /* three equal columns for the case-only plots row */
   .plots-grid-3 {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 900px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1200px;
   }
   .dataTables_wrapper { color: %s !important; font-size: 15px; }
   table.dataTable thead th {
