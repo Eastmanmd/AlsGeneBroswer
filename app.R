@@ -39,9 +39,9 @@ load_deg_results <- function(deg_dir = "data/case_vs_control") {
 
 load_case_only_results <- function(deg_dir = "data/case_only/") {
   analyses <- list(
-    c9orf72          = "c9orf72\\.csv$",
-    age_at_death     = "age_at_death\\.csv$",
-    disease_duration = "disease_duration\\.csv$"
+    c9orf72          = "_c9orf72\\.csv$",
+    age_at_death     = "_age_at_death\\.csv$",
+    disease_duration = "_disease_duration\\.csv$"
   )
   results <- list()
   for (nm in names(analyses)) {
@@ -717,9 +717,11 @@ server <- function(input, output, session) {
     
     pull_tbl <- function(nm, label) {
       df <- case_only_data[[nm]]
-      if (is.null(df)) return(NULL)
+      df <- data.frame(df)
+      #if (is.null(df)) return(NULL)
       df %>%
-        dplyr::filter(symbol == g, tissue == t) %>%
+        dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
+        #dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
         dplyr::select(
           `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
           `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
@@ -727,10 +729,11 @@ server <- function(input, output, session) {
         ) %>%
         dplyr::mutate(Analysis = label, .before = 1) %>%
         dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4)))
+      
     }
     
     tbl <- dplyr::bind_rows(
-      pull_tbl("c9orf72",          "C9orf72 Status"),
+      #pull_tbl("c9orf72",          "C9orf72 Status"),
       pull_tbl("age_at_death",     "Age at Death"),
       pull_tbl("disease_duration", "Disease Duration")
     )
