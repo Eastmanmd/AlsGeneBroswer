@@ -721,7 +721,6 @@ server <- function(input, output, session) {
       #if (is.null(df)) return(NULL)
       df %>%
         dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
-        #dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
         dplyr::select(
           `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
           `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
@@ -733,7 +732,7 @@ server <- function(input, output, session) {
     }
     
     tbl <- dplyr::bind_rows(
-      #pull_tbl("c9orf72",          "C9orf72 Status"),
+      pull_tbl("c9orf72",          "C9orf72 Status"),
       pull_tbl("age_at_death",     "Age at Death"),
       pull_tbl("disease_duration", "Disease Duration")
     )
