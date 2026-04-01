@@ -211,13 +211,17 @@ app_css <- sprintf("
     border-radius: 10px; padding: 20px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
+  .plot-panel-boxplot {
+    max-height: 600px;
+    overflow: hidden;
+  }
   .panel-title {
     font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;
     letter-spacing: 0.1em; text-transform: uppercase; color: %s; margin-bottom: 16px;
   }
   /* three equal columns for the case-only plots row */
   .plots-grid-3 {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 900px;
   }
   .dataTables_wrapper { color: %s !important; font-size: 15px; }
   table.dataTable thead th {
@@ -340,7 +344,7 @@ ui <- fluidPage(
           ),
           
           div(class = "main-content",
-              div(class = "plot-panel",
+              div(class = "plot-panel-boxplot",
                   div(class = "panel-title", uiOutput("plot_title")),
                   uiOutput("boxplot_ui")
               ),
@@ -467,10 +471,12 @@ server <- function(input, output, session) {
   tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
     dplyr::filter(tpm_long_data, condition == "ALS") else NULL
   
-  # ── Tissue dropdown (case-only) ──────────────────────────
+  # ── Tissue dropdown (case-only) — default to Cerebellum ──
   output$co_tissue_select_ui <- renderUI({
     tissues <- if (!is.null(tpm_als_only)) sort(unique(tpm_als_only$tissue)) else character(0)
-    selectInput("co_tissue", label = NULL, choices = tissues, width = "100%")
+    default_tissue <- if ("Cerebellum" %in% tissues) "Cerebellum" else tissues[1]
+    selectInput("co_tissue", label = NULL, choices = tissues,
+                selected = default_tissue, width = "100%")
   })
   
   # ════════════════════════════════════════════════════════
@@ -518,7 +524,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
                  tags$p("Enter a gene symbol and press Explore or hit Enter")))
-    plotOutput("boxplot", height = "440px")
+    plotOutput("boxplot", height = "350px")
   })
   
   output$boxplot <- renderPlot({
@@ -623,7 +629,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
                  tags$p("Enter a gene and select a tissue to begin")))
-    plotOutput("co_c9_boxplot", height = "360px")
+    plotOutput("co_c9_boxplot", height = "240px")
   })
   
   output$co_c9_boxplot <- renderPlot({
@@ -650,7 +656,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
-    plotOutput("co_age_scatter", height = "360px")
+    plotOutput("co_age_scatter", height = "240px")
   })
   
   output$co_age_scatter <- renderPlot({
@@ -675,7 +681,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
-    plotOutput("co_dur_scatter", height = "360px")
+    plotOutput("co_dur_scatter", height = "240px")
   })
   
   output$co_dur_scatter <- renderPlot({
