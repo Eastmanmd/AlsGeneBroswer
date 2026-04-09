@@ -25,68 +25,68 @@ PAL_ACCENT <- "#2980B9"
 
 # ── helpers ─────────────────────────────────────────────────
 
-load_deg_results <- function(deg_dir = "data/case_vs_control") {
-  files <- list.files(deg_dir, pattern = "_als_vs_control\\.csv$", full.names = TRUE)
-  if (length(files) == 0) { warning("No DEG files found in: ", deg_dir); return(NULL) }
-  purrr::map_dfr(files, function(f) {
-    tissue <- sub("_als_vs_control\\.csv$", "", basename(f))
-    df <- suppressMessages(readr::read_csv(f, show_col_types = FALSE))
-    if (!"symbol" %in% colnames(df)) df <- dplyr::rename(df, symbol = 1)
-    df$tissue <- tissue
-    df
-  })
-}
+# load_deg_results <- function(deg_dir = "data/case_vs_control") {
+#   files <- list.files(deg_dir, pattern = "_als_vs_control\\.csv$", full.names = TRUE)
+#   if (length(files) == 0) { warning("No DEG files found in: ", deg_dir); return(NULL) }
+#   purrr::map_dfr(files, function(f) {
+#     tissue <- sub("_als_vs_control\\.csv$", "", basename(f))
+#     df <- suppressMessages(readr::read_csv(f, show_col_types = FALSE))
+#     if (!"symbol" %in% colnames(df)) df <- dplyr::rename(df, symbol = 1)
+#     df$tissue <- tissue
+#     df
+#   })
+# }
 
-load_case_only_results <- function(deg_dir = "data/case_only/") {
-  analyses <- list(
-    c9orf72          = "_c9orf72\\.csv$",
-    age_at_death     = "_age_at_death\\.csv$",
-    disease_duration = "_disease_duration\\.csv$"
-  )
-  results <- list()
-  for (nm in names(analyses)) {
-    files <- list.files(deg_dir, pattern = analyses[[nm]], full.names = TRUE)
-    if (length(files) == 0) next
-    results[[nm]] <- purrr::map_dfr(files, function(f) {
-      tissue <- sub(analyses[[nm]], "", basename(f))
-      df <- suppressMessages(readr::read_csv(f, show_col_types = FALSE))
-      df <- df[, !colnames(df) %in% c("baseMean", "lfcSE", "stat", "AveExpr", "z.std", "...1", "t")]
-      if (!"symbol" %in% colnames(df)) df <- dplyr::rename(df, symbol = 1)
-      df$tissue <- tissue
-      df
-    })
-  }
-  results
-}
+# load_case_only_results <- function(deg_dir = "data/case_only/") {
+#   analyses <- list(
+#     c9orf72          = "_c9orf72\\.csv$",
+#     age_at_death     = "_age_at_death\\.csv$",
+#     disease_duration = "_disease_duration\\.csv$"
+#   )
+#   results <- list()
+#   for (nm in names(analyses)) {
+#     files <- list.files(deg_dir, pattern = analyses[[nm]], full.names = TRUE)
+#     if (length(files) == 0) next
+#     results[[nm]] <- purrr::map_dfr(files, function(f) {
+#       tissue <- sub(analyses[[nm]], "", basename(f))
+#       df <- suppressMessages(readr::read_csv(f, show_col_types = FALSE))
+#       df <- df[, !colnames(df) %in% c("baseMean", "lfcSE", "stat", "AveExpr", "z.std", "...1", "t")]
+#       if (!"symbol" %in% colnames(df)) df <- dplyr::rename(df, symbol = 1)
+#       df$tissue <- tissue
+#       df
+#     })
+#   }
+#   results
+# }
 
-tidy_tpm <- function(tpm_path = "data/tpm.csv", meta_path = "data/metadata.csv") {
-  tpm  <- suppressMessages(readr::read_csv(tpm_path,  show_col_types = FALSE)) %>%
-    column_to_rownames(var = "...1")
-  meta <- suppressMessages(readr::read_csv(meta_path, show_col_types = FALSE)) %>%
-    column_to_rownames(var = "...1")
-  meta$sample <- rownames(meta)
-  
-  tpm_long <- tpm %>%
-    rownames_to_column(var = "gene") %>%
-    tidyr::pivot_longer(cols = -gene, names_to = "sample", values_to = "tpm")
-  
-  keep_cols <- intersect(
-    c("sample", "Sample.Source", "Subject.Group",
-      "c9orf72", "Age.at.Death", "Disease.Duration.in.Months"),
-    colnames(meta)
-  )
-  meta_slim <- meta[, keep_cols]
-  colnames(meta_slim)[colnames(meta_slim) == "Sample.Source"]            <- "tissue"
-  colnames(meta_slim)[colnames(meta_slim) == "Subject.Group"]            <- "condition"
-  if ("C9orf72.Status" %in% colnames(meta_slim))
-    colnames(meta_slim)[colnames(meta_slim) == "C9orf72.Status"]         <- "c9orf72"
-  if ("Age.at.Death" %in% colnames(meta_slim))
-    colnames(meta_slim)[colnames(meta_slim) == "Age.at.Death"]           <- "age_at_death"
-  if ("Disease.Duration.in.Months" %in% colnames(meta_slim))
-    colnames(meta_slim)[colnames(meta_slim) == "Disease.Duration.in.Months"] <- "disease_duration"
-  
-  dplyr::left_join(tpm_long, meta_slim, by = "sample")
-}
+# tidy_tpm <- function(tpm_path = "data/tpm.csv", meta_path = "data/metadata.csv") {
+#   tpm  <- suppressMessages(readr::read_csv(tpm_path,  show_col_types = FALSE)) %>%
+#     column_to_rownames(var = "...1")
+#   meta <- suppressMessages(readr::read_csv(meta_path, show_col_types = FALSE)) %>%
+#     column_to_rownames(var = "...1")
+#   meta$sample <- rownames(meta)
+#   
+#   tpm_long <- tpm %>%
+#     rownames_to_column(var = "gene") %>%
+#     tidyr::pivot_longer(cols = -gene, names_to = "sample", values_to = "tpm")
+#   
+#   keep_cols <- intersect(
+#     c("sample", "Sample.Source", "Subject.Group",
+#       "c9orf72", "Age.at.Death", "Disease.Duration.in.Months"),
+#     colnames(meta)
+#   )
+#   meta_slim <- meta[, keep_cols]
+#   colnames(meta_slim)[colnames(meta_slim) == "Sample.Source"]            <- "tissue"
+#   colnames(meta_slim)[colnames(meta_slim) == "Subject.Group"]            <- "condition"
+#   if ("C9orf72.Status" %in% colnames(meta_slim))
+#     colnames(meta_slim)[colnames(meta_slim) == "C9orf72.Status"]         <- "c9orf72"
+#   if ("Age.at.Death" %in% colnames(meta_slim))
+#     colnames(meta_slim)[colnames(meta_slim) == "Age.at.Death"]           <- "age_at_death"
+#   if ("Disease.Duration.in.Months" %in% colnames(meta_slim))
+#     colnames(meta_slim)[colnames(meta_slim) == "Disease.Duration.in.Months"] <- "disease_duration"
+#   
+#   dplyr::left_join(tpm_long, meta_slim, by = "sample")
+# }
 
 # ── shared ggplot theme ──────────────────────────────────────
 als_theme <- function() {
@@ -146,11 +146,11 @@ app_css <- sprintf("
     width: 36px; height: 36px;
     background: linear-gradient(135deg, %s 0%%, %s 100%%);
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 13px; font-weight: 700;
     color: #fff; flex-shrink: 0;
   }
   .app-header h1 {
-    font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 16px; font-weight: 700;
     letter-spacing: 0.04em; color: %s;
   }
   .app-header .subtitle { font-size: 12px; color: %s; margin-top: 2px; }
@@ -160,7 +160,7 @@ app_css <- sprintf("
   }
   .top-tab-btn {
     background: none; border: none; padding: 13px 24px;
-    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase; color: %s;
     cursor: pointer; border-bottom: 3px solid transparent;
     transition: color .15s, border-color .15s; position: relative; bottom: -2px;
@@ -177,7 +177,7 @@ app_css <- sprintf("
   }
   .sidebar-section { margin-bottom: 26px; }
   .sidebar-label {
-    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.12em; text-transform: uppercase; color: %s;
     margin-bottom: 10px; display: block;
   }
@@ -185,7 +185,7 @@ app_css <- sprintf("
     width: 100%%;
     background: %s !important; border: 1px solid %s !important;
     color: %s !important; border-radius: 6px !important;
-    font-family: 'Space Mono', monospace !important;
+    font-family: 'Open Sans', monospace !important;
     font-size: 15px !important; padding: 9px 12px !important;
     outline: none; transition: border-color .15s, box-shadow .15s;
     letter-spacing: 0.06em;
@@ -211,7 +211,7 @@ app_css <- sprintf("
     width: 100%%;
     background: linear-gradient(135deg, %s 0%%, %s 100%%);
     border: none; border-radius: 6px; color: #fff;
-    font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 13px; font-weight: 700;
     letter-spacing: 0.06em; padding: 10px 16px; cursor: pointer;
     transition: opacity .2s; margin-top: 8px;
   }
@@ -240,7 +240,7 @@ app_css <- sprintf("
     overflow: hidden;
   }
   .panel-title {
-    font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;
+    font-family: 'Open Sans', monospace; font-size: 12px; font-weight: 700;
     letter-spacing: 0.1em; text-transform: uppercase; color: %s; margin-bottom: 16px;
   }
   /* three equal columns for the case-only plots row */
@@ -251,7 +251,7 @@ app_css <- sprintf("
   table.dataTable thead th {
     background: %s !important; color: %s !important;
     border-bottom: 1px solid %s !important;
-    font-family: 'Space Mono', monospace !important;
+    font-family: 'Open Sans', monospace !important;
     font-size: 12px !important; letter-spacing: 0.08em !important;
     text-transform: uppercase !important;
   }
@@ -317,10 +317,10 @@ ui <- fluidPage(
   
   # ── Header ────────────────────────────────────────────────
   div(class = "app-header",
-      div(class = "logo-mark", "ALS"),
+      div(class = "logo-mark", "NYGC"),
       div(
         tags$h1("Gene Expression Explorer"),
-        div(class = "subtitle", "ALS vs Control · Multi-tissue DEG Analysis")
+        div(class = "subtitle", "Amyotrophic lateral sclerosis (ALS) Multi-tissue DEG Analysis")
       )
   ),
   
