@@ -50,6 +50,7 @@ load_case_only_results <- function(deg_dir = "data/case_only/") {
     results[[nm]] <- purrr::map_dfr(files, function(f) {
       tissue <- sub(analyses[[nm]], "", basename(f))
       df <- suppressMessages(readr::read_csv(f, show_col_types = FALSE))
+      df <- df[, !colnames(df) %in% c("baseMean", "lfcSE", "stat", "AveExpr", "z.std", "...1", "t")]
       if (!"symbol" %in% colnames(df)) df <- dplyr::rename(df, symbol = 1)
       df$tissue <- tissue
       df
@@ -105,6 +106,29 @@ als_theme <- function() {
       plot.margin       = margin(12, 12, 12, 12)
     )
 }
+
+
+# ── Load data ONCE ──────────────────────────────────────
+tpm_long_data <- tryCatch(
+  #suppressMessages(tidy_tpm("data/tpm.csv", "data/metadata.csv")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor_subset.rds")),
+  error = function(e) { message("TPM load error: ", e$message); NULL }
+)
+deg_all_data <- tryCatch(
+  #suppressMessages(load_deg_results("data/case_vs_control")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data_subset.rds")),
+  error = function(e) { message("DEG load error: ", e$message); NULL }
+)
+case_only_data <- tryCatch(
+  #suppressMessages(load_case_only_results("data/case_only/")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data_subset.rds")),
+  error = function(e) { message("Case-only load error: ", e$message); list() }
+)
+
+# ALS-only subset for case-only plots
+tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
+  dplyr::filter(tpm_long_data, condition == "ALS") else NULL
+
 
 # ── CSS ──────────────────────────────────────────────────────
 app_css <- sprintf("
@@ -453,23 +477,26 @@ ui <- fluidPage(
 # ── Server ────────────────────────────────────────────────────
 server <- function(input, output, session) {
   
-  # ── Load data ONCE ──────────────────────────────────────
-  tpm_long_data <- tryCatch(
-    suppressMessages(tidy_tpm("data/tpm.csv", "data/metadata.csv")),
-    error = function(e) { message("TPM load error: ", e$message); NULL }
-  )
-  deg_all_data <- tryCatch(
-    suppressMessages(load_deg_results("data/case_vs_control")),
-    error = function(e) { message("DEG load error: ", e$message); NULL }
-  )
-  case_only_data <- tryCatch(
-    suppressMessages(load_case_only_results("data/case_only/")),
-    error = function(e) { message("Case-only load error: ", e$message); list() }
-  )
-  
-  # ALS-only subset for case-only plots
-  tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
-    dplyr::filter(tpm_long_data, condition == "ALS") else NULL
+  # # ── Load data ONCE ──────────────────────────────────────
+  # tpm_long_data <- tryCatch(
+  #   #suppressMessages(tidy_tpm("data/tpm.csv", "data/metadata.csv")),
+  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data.rds")),
+  #   error = function(e) { message("TPM load error: ", e$message); NULL }
+  # )
+  # deg_all_data <- tryCatch(
+  #   #suppressMessages(load_deg_results("data/case_vs_control")),
+  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data.rds")),
+  #   error = function(e) { message("DEG load error: ", e$message); NULL }
+  # )
+  # case_only_data <- tryCatch(
+  #   #suppressMessages(load_case_only_results("data/case_only/")),
+  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data.rds")),
+  #   error = function(e) { message("Case-only load error: ", e$message); list() }
+  # )
+  # 
+  # # ALS-only subset for case-only plots
+  # tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
+  #   dplyr::filter(tpm_long_data, condition == "ALS") else NULL
   
   # ── Tissue dropdown (case-only) — default to Cerebellum ──
   output$co_tissue_select_ui <- renderUI({
