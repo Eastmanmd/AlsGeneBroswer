@@ -241,7 +241,7 @@ app_css <- sprintf("
   }
   .panel-title {
     font-family: 'Open Sans', monospace; font-size: 12px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase; color: %s; margin-bottom: 16px;
+    letter-spacing: 0.1em; color: %s; margin-bottom: 16px;
   }
   /* three equal columns for the case-only plots row */
   .plots-grid-3 {
@@ -536,7 +536,7 @@ server <- function(input, output, session) {
   output$plot_title <- renderUI({
     g <- selected_gene()
     if (is.null(g) || g == "") return("Enter a gene symbol to begin")
-    paste0("Expression of  ", g, "  across tissues")
+    paste0(g, " Expression Across Tissues")
   })
   
   output$boxplot_ui <- renderUI({
