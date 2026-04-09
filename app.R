@@ -610,7 +610,7 @@ server <- function(input, output, session) {
   co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
     req(input$co_tissue)
     list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
-  }, ignoreNULL = FALSE)
+  }, ignoreNULL = TRUE, ignoreInit = TRUE)
   
   observe({
     sel <- co_selected()
@@ -629,24 +629,24 @@ server <- function(input, output, session) {
   # ── panel titles ─────────────────────────────────────────
   output$co_boxplot_title <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "") return("Select a gene and tissue")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "") return("Select a gene and tissue")
     paste0(sel$gene, "  \u2014  C9orf72 Status  \u00b7  ", sel$tissue)
   })
   output$co_age_title <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "") return("Age at Death")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "") return("Age at Death")
     paste0(sel$gene, "  \u2014  Age at Death  \u00b7  ", sel$tissue)
   })
   output$co_dur_title <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "") return("Disease Duration")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "") return("Disease Duration")
     paste0(sel$gene, "  \u2014  Disease Duration  \u00b7  ", sel$tissue)
   })
   
   # ── C9orf72 boxplot ──────────────────────────────────────
   output$co_c9_boxplot_ui <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
                  tags$p("Enter a gene and select a tissue to begin")))
@@ -673,7 +673,7 @@ server <- function(input, output, session) {
   # ── Age at death scatter ─────────────────────────────────
   output$co_age_scatter_ui <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
@@ -698,7 +698,7 @@ server <- function(input, output, session) {
   # ── Disease duration scatter ─────────────────────────────
   output$co_dur_scatter_ui <- renderUI({
     sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "")
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
