@@ -457,12 +457,6 @@ ui <- fluidPage(
       if (document.activeElement.id === 'co_gene_input')
         Shiny.setInputValue('co_go', Math.random());
     });
-    document.addEventListener('input', function(e) {
-      if (e.target.id === 'gene_input')
-        Shiny.setInputValue('gene_input', e.target.value);
-      if (e.target.id === 'co_gene_input')
-        Shiny.setInputValue('co_gene_input', e.target.value);
-    });
     Shiny.addCustomMessageHandler('toggleGeneError', function(msg) {
       var el = document.getElementById('gene_error_msg');
       if (el) el.style.display = msg.show ? 'block' : 'none';
@@ -510,7 +504,7 @@ server <- function(input, output, session) {
   # TAB 1 — Case vs Control
   # ════════════════════════════════════════════════════════
   
-  selected_gene <- eventReactive(list(input$go, input$gene_input), {
+  selected_gene <- eventReactive(list(input$go), {
     trimws(toupper(input$gene_input))
   }, ignoreNULL = FALSE)
   
@@ -613,7 +607,7 @@ server <- function(input, output, session) {
   # ════════════════════════════════════════════════════════
   
   # ── fix: include co_tissue in trigger list + req() guard ──
-  co_selected <- eventReactive(list(input$co_go, input$co_gene_input, input$co_tissue), {
+  co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
     req(input$co_tissue)
     list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
   }, ignoreNULL = FALSE)
