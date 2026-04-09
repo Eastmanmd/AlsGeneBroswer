@@ -391,7 +391,7 @@ ui <- fluidPage(
                   tags$span(class = "sidebar-label", "Gene"),
                   tags$input(id = "co_gene_input", class = "gene-text-input",
                              type = "text", value = "CHIT1", placeholder = "e.g. SOD1"),
-                  div(class = "gene-hint", "Enter an official gene symbol"),
+                  div(class = "gene-hint", "Enter an official gene symbol (e.g. SOD1, TARDBP, FUS)"),
                   div(class = "gene-error", id = "co_gene_error_msg", "\u26a0 Gene not found in dataset")
               ),
               div(class = "sidebar-section",
