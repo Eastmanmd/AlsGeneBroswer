@@ -435,7 +435,7 @@ ui <- fluidPage(
               
               # ── Row 2: DEG table ─────────────────────────────────
               div(class = "plot-panel",
-                  div(class = "panel-title", "Case-Only DEG Results"),
+                  div(class = "panel-title", "Differential Expression Results Across Select Clincal Variables"),
                   uiOutput("co_deg_table_ui")
               )
           )
