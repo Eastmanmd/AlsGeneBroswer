@@ -316,10 +316,19 @@ ui <- fluidPage(
   ),
   
   # ── Header ────────────────────────────────────────────────
+  # div(class = "app-header",
+  #     div(class = "logo-mark", "NYGC"),
+  #     div(
+  #       tags$h1("Gene Expression Explorer"),
+  #       div(class = "subtitle", "Amyotrophic lateral sclerosis (ALS) Multi-tissue DEG Analysis")
+  #     )
+  # ),
+  
   div(class = "app-header",
-      div(class = "logo-mark", "NYGC"),
+      tags$img(src = "logo.svg", height = "80px",
+               style = "object-fit: contain; flex-shrink: 0;"),
       div(
-        tags$h1("Gene Expression Explorer"),
+        tags$h1("ALS Gene Expression Explorer"),
         div(class = "subtitle", "Amyotrophic lateral sclerosis (ALS) Multi-tissue DEG Analysis")
       )
   ),
