@@ -143,7 +143,7 @@ app_css <- sprintf("
     box-shadow: 0 1px 4px rgba(0,0,0,0.07);
   }
   .app-header .logo-mark {
-    width: 36px; height: 36px;
+    width: 42px; height: 42px;
     background: linear-gradient(135deg, %s 0%%, %s 100%%);
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
     font-family: 'Open Sans', monospace; font-size: 13px; font-weight: 700;
@@ -309,7 +309,7 @@ ui <- fluidPage(
   title = "ALS Gene Expression Explorer",
   tags$head(
     tags$link(
-      href = "https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap",
+      href = "https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap",
       rel  = "stylesheet"
     ),
     tags$style(HTML(app_css))
