@@ -352,6 +352,8 @@ ui <- fluidPage(
                   tags$span(class = "sidebar-label", "Gene Search"),
                   tags$input(id = "gene_input", class = "gene-text-input",
                              type = "text", value = "CHIT1", placeholder = "e.g. SOD1"),
+                  tags$datalist(id = "gene_suggestions",
+                                uiOutput("gene_datalist_options")),
                   div(class = "gene-hint", "Enter an official gene symbol (e.g. SOD1, TARDBP, FUS)"),
                   div(class = "gene-error", id = "gene_error_msg", "\u26a0 Gene not found in dataset"),
                   tags$button(class = "btn-search", id = "go_btn",
@@ -509,6 +511,7 @@ server <- function(input, output, session) {
                 selected = default_tissue, width = "100%")
   })
   
+
   # ════════════════════════════════════════════════════════
   # TAB 1 — Case vs Control
   # ════════════════════════════════════════════════════════
@@ -522,6 +525,13 @@ server <- function(input, output, session) {
     if (is.null(tpm_long_data) || is.null(g) || g == "") return()
     session$sendCustomMessage("toggleGeneError",
                               list(show = !(g %in% tpm_long_data$gene)))
+  })
+  
+  # Suggest genes as user types
+  output$gene_datalist_options <- renderUI({
+    req(tpm_long_data)
+    genes <- sort(unique(tpm_long_data$symbol))
+    tagList(lapply(genes, function(g) tags$option(value = g)))
   })
   
   output$data_status <- renderUI({
@@ -562,7 +572,7 @@ server <- function(input, output, session) {
     gene_data <- tpm_long_data %>%
       dplyr::filter(gene == selected_gene(), !is.na(tissue), !is.na(condition))
     validate(need(nrow(gene_data) > 0,
-                  paste0("'", selected_gene(), "' was not found in the TPM data.")))
+                  paste0("'", selected_gene(), "' was not found in the expression data.")))
     ggplot(gene_data,
            aes(x = tissue, y = log2(tpm + 1), fill = condition, color = condition)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6,
