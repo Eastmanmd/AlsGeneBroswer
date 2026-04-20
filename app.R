@@ -1,6 +1,7 @@
 # ============================================================
 #  ALS Differential Gene Expression Explorer — Shiny App
 #  Two tabs: Case vs Control | Case Only Analysis
+#  No JavaScript — pure Shiny reactive tab switching
 # ============================================================
 
 library(shiny)
@@ -65,11 +66,9 @@ PAL_ACCENT <- "#2980B9"
 #   meta <- suppressMessages(readr::read_csv(meta_path, show_col_types = FALSE)) %>%
 #     column_to_rownames(var = "...1")
 #   meta$sample <- rownames(meta)
-#   
 #   tpm_long <- tpm %>%
 #     rownames_to_column(var = "gene") %>%
 #     tidyr::pivot_longer(cols = -gene, names_to = "sample", values_to = "tpm")
-#   
 #   keep_cols <- intersect(
 #     c("sample", "Sample.Source", "Subject.Group",
 #       "c9orf72", "Age.at.Death", "Disease.Duration.in.Months"),
@@ -84,7 +83,6 @@ PAL_ACCENT <- "#2980B9"
 #     colnames(meta_slim)[colnames(meta_slim) == "Age.at.Death"]           <- "age_at_death"
 #   if ("Disease.Duration.in.Months" %in% colnames(meta_slim))
 #     colnames(meta_slim)[colnames(meta_slim) == "Disease.Duration.in.Months"] <- "disease_duration"
-#   
 #   dplyr::left_join(tpm_long, meta_slim, by = "sample")
 # }
 
@@ -107,20 +105,16 @@ als_theme <- function() {
     )
 }
 
-
 # ── Load data ONCE ──────────────────────────────────────
 tpm_long_data <- tryCatch(
-  #suppressMessages(tidy_tpm("data/tpm.csv", "data/metadata.csv")),
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor_subset.rds")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor.rds")),
   error = function(e) { message("TPM load error: ", e$message); NULL }
 )
 deg_all_data <- tryCatch(
-  #suppressMessages(load_deg_results("data/case_vs_control")),
   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data_subset.rds")),
   error = function(e) { message("DEG load error: ", e$message); NULL }
 )
 case_only_data <- tryCatch(
-  #suppressMessages(load_case_only_results("data/case_only/")),
   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data_subset.rds")),
   error = function(e) { message("Case-only load error: ", e$message); list() }
 )
@@ -129,6 +123,9 @@ case_only_data <- tryCatch(
 tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
   dplyr::filter(tpm_long_data, condition == "ALS") else NULL
 
+# Pre-compute gene list once for autocomplete
+all_genes <- if (!is.null(tpm_long_data) && "gene" %in% colnames(tpm_long_data))
+  sort(unique(tpm_long_data$gene)) else character(0)
 
 # ── CSS ──────────────────────────────────────────────────────
 app_css <- sprintf("
@@ -142,31 +139,29 @@ app_css <- sprintf("
     padding: 16px 32px; display: flex; align-items: center; gap: 16px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.07);
   }
-  .app-header .logo-mark {
-    width: 42px; height: 42px;
-    background: linear-gradient(135deg, %s 0%%, %s 100%%);
-    border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    font-family: 'Open Sans', monospace; font-size: 13px; font-weight: 700;
-    color: #fff; flex-shrink: 0;
-  }
   .app-header h1 {
     font-family: 'Open Sans', monospace; font-size: 16px; font-weight: 700;
     letter-spacing: 0.04em; color: %s;
   }
   .app-header .subtitle { font-size: 12px; color: %s; margin-top: 2px; }
-  .top-tabs {
+
+  /* ── Tab bar using Shiny navbarPage override ── */
+  .navbar { display: none; }
+  .tab-bar {
     display: flex; background: %s; border-bottom: 2px solid %s;
     padding: 0 0 0 260px;
   }
-  .top-tab-btn {
+  .tab-btn {
     background: none; border: none; padding: 13px 24px;
     font-family: 'Open Sans', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase; color: %s;
     cursor: pointer; border-bottom: 3px solid transparent;
     transition: color .15s, border-color .15s; position: relative; bottom: -2px;
   }
-  .top-tab-btn.active { color: %s; border-bottom-color: %s; }
-  .top-tab-btn:hover:not(.active) { color: %s; }
+  .tab-btn.active { color: %s; border-bottom-color: %s; }
+  .tab-btn:hover:not(.active) { color: %s; }
+
+  /* ── Layout ── */
   .main-layout {
     display: grid; grid-template-columns: 260px 1fr;
     gap: 0; height: calc(100vh - 113px);
@@ -181,32 +176,49 @@ app_css <- sprintf("
     letter-spacing: 0.12em; text-transform: uppercase; color: %s;
     margin-bottom: 10px; display: block;
   }
-  .gene-text-input {
-    width: 100%%;
+
+  /* ── selectize gene search ── */
+  .sidebar .selectize-input {
     background: %s !important; border: 1px solid %s !important;
     color: %s !important; border-radius: 6px !important;
     font-family: 'Open Sans', monospace !important;
     font-size: 15px !important; padding: 9px 12px !important;
-    outline: none; transition: border-color .15s, box-shadow .15s;
-    letter-spacing: 0.06em;
+    box-shadow: none !important; letter-spacing: 0.06em;
   }
-  .gene-text-input:focus {
+  .sidebar .selectize-input.focus {
     border-color: %s !important;
     box-shadow: 0 0 0 2px rgba(41,128,185,0.15) !important;
   }
-  .sidebar .selectize-input {
+  .sidebar .selectize-dropdown {
+    background: %s !important; border: 1px solid %s !important;
+    color: %s !important; font-size: 14px !important;
+    font-family: 'Open Sans', monospace !important;
+  }
+  .sidebar .selectize-dropdown-content .option { padding: 8px 12px; }
+  .sidebar .selectize-dropdown-content .option:hover,
+  .sidebar .selectize-dropdown-content .option.active {
+    background: #EAF4FB !important; color: %s !important;
+  }
+  .sidebar .selectize-dropdown-content .option.selected {
+    background: rgba(41,128,185,0.1) !important;
+  }
+
+  /* tissue dropdown (case-only) */
+  .tissue-select .selectize-input {
     background: %s !important; border: 1px solid %s !important;
     color: %s !important; border-radius: 6px !important;
     font-size: 14px !important; padding: 8px 12px !important;
     box-shadow: none !important;
   }
-  .sidebar .selectize-dropdown {
+  .tissue-select .selectize-dropdown {
     background: %s !important; border: 1px solid %s !important;
     color: %s !important; font-size: 14px !important;
   }
-  .sidebar .selectize-dropdown-content .option:hover { background: #EAF4FB !important; }
-  .gene-hint  { font-size: 13px; color: %s; margin-top: 6px;  line-height: 1.4; }
-  .gene-error { font-size: 13px; color: %s; margin-top: 4px;  display: none; }
+  .tissue-select .selectize-dropdown-content .option:hover { background: #EAF4FB !important; }
+
+  .gene-hint  { font-size: 13px; color: %s; margin-top: 6px; line-height: 1.4; }
+  .gene-error { font-size: 13px; color: %s; margin-top: 4px; }
+
   .btn-search {
     width: 100%%;
     background: linear-gradient(135deg, %s 0%%, %s 100%%);
@@ -216,6 +228,7 @@ app_css <- sprintf("
     transition: opacity .2s; margin-top: 8px;
   }
   .btn-search:hover { opacity: 0.85; }
+
   .legend-item {
     display: flex; align-items: center; gap: 8px;
     margin-bottom: 7px; font-size: 14px; color: %s;
@@ -226,6 +239,7 @@ app_css <- sprintf("
     padding: 4px 12px; font-size: 13px; color: %s;
     display: inline-block; margin: 3px 3px 3px 0;
   }
+
   .main-content {
     display: flex; flex-direction: column;
     overflow-y: auto; background: %s; padding: 24px; gap: 24px;
@@ -235,18 +249,16 @@ app_css <- sprintf("
     border-radius: 10px; padding: 20px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
-  .plot-panel-boxplot {
-    max-height: 600px;
-    overflow: hidden;
-  }
+  .plot-panel-boxplot { max-height: 600px; overflow: hidden; }
   .panel-title {
     font-family: 'Open Sans', monospace; font-size: 12px; font-weight: 700;
     letter-spacing: 0.1em; color: %s; margin-bottom: 16px;
   }
-  /* three equal columns for the case-only plots row */
   .plots-grid-3 {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1200px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1600px;
   }
+
+  /* DataTables */
   .dataTables_wrapper { color: %s !important; font-size: 15px; }
   table.dataTable thead th {
     background: %s !important; color: %s !important;
@@ -266,6 +278,7 @@ app_css <- sprintf("
   .dataTables_info, .dataTables_paginate { color: %s !important; }
   .paginate_button { color: %s !important; }
   .paginate_button.current { background: rgba(41,128,185,0.12) !important; border-radius: 4px; }
+
   .empty-state {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -273,33 +286,43 @@ app_css <- sprintf("
   }
   .empty-state .es-icon { font-size: 40px; opacity: 0.25; }
   .empty-state p { font-size: 15px; }
+
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: %s; border-radius: 10px; }
 ",
                    PAL_BG, PAL_TEXT,
                    PAL_PANEL, PAL_BORDER,
-                   PAL_ALS, "#8E44AD",
                    PAL_TEXT, PAL_MUTED,
-                   PAL_PANEL, PAL_BORDER,
-                   PAL_MUTED, PAL_ACCENT, PAL_ACCENT, PAL_TEXT,
+                   # tab bar
+                   PAL_PANEL, PAL_BORDER, PAL_MUTED, PAL_ACCENT, PAL_ACCENT, PAL_TEXT,
+                   # sidebar
                    PAL_PANEL, PAL_BORDER, PAL_MUTED,
+                   # selectize gene
                    PAL_PANEL, PAL_BORDER, PAL_TEXT, PAL_ACCENT,
+                   PAL_PANEL, PAL_BORDER, PAL_TEXT, PAL_TEXT,
+                   # tissue select
                    PAL_PANEL, PAL_BORDER, PAL_TEXT,
                    PAL_PANEL, PAL_BORDER, PAL_TEXT,
+                   # hints
                    PAL_MUTED, PAL_ALS,
+                   # btn
                    PAL_ACCENT, "#1A5276",
                    PAL_TEXT,
+                   # chips
                    PAL_BG, PAL_BORDER, PAL_MUTED,
+                   # content
                    PAL_BG,
                    PAL_PANEL, PAL_BORDER,
                    PAL_MUTED,
+                   # tables
                    PAL_TEXT,
                    PAL_BG, PAL_TEXT, PAL_BORDER,
                    PAL_PANEL,
                    PAL_BORDER, PAL_TEXT,
                    PAL_PANEL, PAL_BORDER, PAL_TEXT,
                    PAL_MUTED, PAL_TEXT,
+                   # empty state / scrollbar
                    PAL_MUTED,
                    PAL_BORDER
 )
@@ -316,14 +339,6 @@ ui <- fluidPage(
   ),
   
   # ── Header ────────────────────────────────────────────────
-  # div(class = "app-header",
-  #     div(class = "logo-mark", "NYGC"),
-  #     div(
-  #       tags$h1("Gene Expression Explorer"),
-  #       div(class = "subtitle", "Amyotrophic lateral sclerosis (ALS) Multi-tissue DEG Analysis")
-  #     )
-  # ),
-  
   div(class = "app-header",
       tags$img(src = "logo.svg", height = "80px",
                style = "object-fit: contain; flex-shrink: 0;"),
@@ -333,175 +348,173 @@ ui <- fluidPage(
       )
   ),
   
-  # ── Top tab bar ───────────────────────────────────────────
-  div(class = "top-tabs",
-      tags$button(class = "top-tab-btn active", id = "ttab_cvc",
-                  onclick = "switchTopTab('cvc')", "Case vs Control"),
-      tags$button(class = "top-tab-btn", id = "ttab_co",
-                  onclick = "switchTopTab('co')",  "Case Only Analysis")
+  # ── Pure-Shiny tab bar ────────────────────────────────────
+  div(class = "tab-bar",
+      uiOutput("tab_cvc_btn"),
+      uiOutput("tab_co_btn")
   ),
   
-  # ══════════════════════════════════════════════════════════
+  # ── Active tab content (conditionalPanel — always rendered) ──
+  # Both panels are kept in the DOM; only visibility toggled via
+  # CSS display so plots don't need to re-render on tab switch.
+  
   # TAB 1 — Case vs Control
-  # ══════════════════════════════════════════════════════════
-  div(id = "tab_cvc",
-      div(class = "main-layout",
-          
-          div(class = "sidebar",
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Gene Search"),
-                  tags$input(id = "gene_input", class = "gene-text-input",
-                             type = "text", value = "CHIT1", placeholder = "e.g. SOD1"),
-                  tags$datalist(id = "gene_suggestions",
-                                uiOutput("gene_datalist_options")),
-                  div(class = "gene-hint", "Enter an official gene symbol (e.g. SOD1, TARDBP, FUS)"),
-                  div(class = "gene-error", id = "gene_error_msg", "\u26a0 Gene not found in dataset"),
-                  tags$button(class = "btn-search", id = "go_btn",
-                              onclick = "Shiny.setInputValue('go', Math.random())",
-                              "\u25b6  EXPLORE GENE")
-              ),
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Colour Legend"),
-                  div(class = "legend-item",
-                      div(class = "legend-dot", style = paste0("background:", PAL_ALS)), "ALS"),
-                  div(class = "legend-item",
-                      div(class = "legend-dot", style = paste0("background:", PAL_CTRL)), "Control")
-              ),
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Significance Thresholds"),
-                  div(class = "stat-chip", "FDR < 0.05"),
-                  div(class = "stat-chip", "|log\u2082FC| > 1")
-              ),
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Status"),
-                  uiOutput("data_status")
-              )
-          ),
-          
-          div(class = "main-content",
-              div(class = "plot-panel-boxplot",
-                  div(class = "panel-title", uiOutput("plot_title")),
-                  uiOutput("boxplot_ui")
-              ),
-              div(class = "plot-panel",
-                  div(class = "panel-title", "Differential Expression Results by Tissue"),
-                  uiOutput("deg_table_ui")
-              )
-          )
-      )
+  conditionalPanel(
+    condition = "input.active_tab == 'cvc'",
+    div(class = "main-layout",
+        div(class = "sidebar",
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Gene Search"),
+                # selectizeInput with autocomplete (search-as-you-type)
+                selectizeInput(
+                  "gene_input",
+                  label   = NULL,
+                  choices = all_genes,
+                  selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+                  options = list(
+                    placeholder      = "e.g. SOD1",
+                    maxOptions       = 50,
+                    searchField      = "value",
+                    openOnFocus      = FALSE,
+                    highlight        = TRUE,
+                    closeAfterSelect = TRUE,
+                    plugins          = list("clear_button")
+                  ),
+                  width = "100%"
+                ),
+                div(class = "gene-hint",
+                    "Type to search gene symbols (e.g. SOD1, TARDBP, FUS)"),
+                actionButton("go", "\u25b6  EXPLORE GENE",
+                             class = "btn-search")
+            ),
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Colour Legend"),
+                div(class = "legend-item",
+                    div(class = "legend-dot", style = paste0("background:", PAL_ALS)), "ALS"),
+                div(class = "legend-item",
+                    div(class = "legend-dot", style = paste0("background:", PAL_CTRL)), "Control")
+            ),
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Significance Thresholds"),
+                div(class = "stat-chip", "FDR < 0.05"),
+                div(class = "stat-chip", "|log\u2082FC| > 1")
+            ),
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Status"),
+                uiOutput("data_status")
+            )
+        ),
+        div(class = "main-content",
+            div(class = "plot-panel plot-panel-boxplot",
+                div(class = "panel-title", uiOutput("plot_title")),
+                uiOutput("boxplot_ui")
+            ),
+            div(class = "plot-panel",
+                div(class = "panel-title", "Differential Expression Results by Tissue"),
+                uiOutput("deg_table_ui")
+            )
+        )
+    )
   ),
   
-  # ══════════════════════════════════════════════════════════
   # TAB 2 — Case Only Analysis
-  # ══════════════════════════════════════════════════════════
-  div(id = "tab_co", style = "display:none",
-      div(class = "main-layout",
-          
-          div(class = "sidebar",
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Gene"),
-                  tags$input(id = "co_gene_input", class = "gene-text-input",
-                             type = "text", value = "CHIT1", placeholder = "e.g. SOD1"),
-                  div(class = "gene-hint", "Enter an official gene symbol (e.g. SOD1, TARDBP, FUS)"),
-                  div(class = "gene-error", id = "co_gene_error_msg", "\u26a0 Gene not found in dataset")
-              ),
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Tissue"),
-                  uiOutput("co_tissue_select_ui")
-              ),
-              tags$button(class = "btn-search", id = "co_go_btn",
-                          onclick = "Shiny.setInputValue('co_go', Math.random())",
-                          "\u25b6  EXPLORE GENE"),
-              div(class = "sidebar-section", style = "margin-top:26px",
-                  tags$span(class = "sidebar-label", "C9orf72 Legend"),
-                  div(class = "legend-item",
-                      div(class = "legend-dot", style = paste0("background:", PAL_C9_YES)), "C9orf72+"),
-                  div(class = "legend-item",
-                      div(class = "legend-dot", style = paste0("background:", PAL_C9_NO)),  "C9orf72\u2212")
-              ),
-              div(class = "sidebar-section",
-                  tags$span(class = "sidebar-label", "Significance Thresholds"),
-                  div(class = "stat-chip", "FDR < 0.05"),
-                  div(class = "stat-chip", "|log\u2082FC| > 1")
-              )
-          ),
-          
-          div(class = "main-content",
-              
-              # ── Row 1: all three plots side by side ─────────────
-              div(class = "plots-grid-3",
-                  div(class = "plot-panel",
-                      div(class = "panel-title", uiOutput("co_boxplot_title")),
-                      uiOutput("co_c9_boxplot_ui")
+  conditionalPanel(
+    condition = "input.active_tab == 'co'",
+    div(class = "main-layout",
+        div(class = "sidebar",
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Gene"),
+                selectizeInput(
+                  "co_gene_input",
+                  label    = NULL,
+                  choices  = all_genes,
+                  selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+                  options  = list(
+                    placeholder      = "e.g. SOD1",
+                    maxOptions       = 50,
+                    searchField      = "value",
+                    openOnFocus      = FALSE,
+                    highlight        = TRUE,
+                    closeAfterSelect = TRUE,
+                    plugins          = list("clear_button")
                   ),
-                  div(class = "plot-panel",
-                      div(class = "panel-title", uiOutput("co_age_title")),
-                      uiOutput("co_age_scatter_ui")
-                  ),
-                  div(class = "plot-panel",
-                      div(class = "panel-title", uiOutput("co_dur_title")),
-                      uiOutput("co_dur_scatter_ui")
-                  )
-              ),
-              
-              # ── Row 2: DEG table ─────────────────────────────────
-              div(class = "plot-panel",
-                  div(class = "panel-title", "Differential Expression Results Across Select Clincal Variables"),
-                  uiOutput("co_deg_table_ui")
-              )
-          )
-      )
+                  width = "100%"
+                ),
+                div(class = "gene-hint",
+                    "Type to search gene symbols (e.g. SOD1, TARDBP, FUS)")
+            ),
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Tissue"),
+                div(class = "tissue-select",
+                    uiOutput("co_tissue_select_ui"))
+            ),
+            actionButton("co_go", "\u25b6  EXPLORE GENE",
+                         class = "btn-search"),
+            div(class = "sidebar-section", style = "margin-top:26px",
+                tags$span(class = "sidebar-label", "C9orf72 Legend"),
+                div(class = "legend-item",
+                    div(class = "legend-dot", style = paste0("background:", PAL_C9_YES)), "C9orf72+"),
+                div(class = "legend-item",
+                    div(class = "legend-dot", style = paste0("background:", PAL_C9_NO)),  "C9orf72\u2212")
+            ),
+            div(class = "sidebar-section",
+                tags$span(class = "sidebar-label", "Significance Thresholds"),
+                div(class = "stat-chip", "FDR < 0.05"),
+                div(class = "stat-chip", "|log\u2082FC| > 1")
+            )
+        ),
+        div(class = "main-content",
+            div(class = "plots-grid-3",
+                div(class = "plot-panel",
+                    div(class = "panel-title", uiOutput("co_boxplot_title")),
+                    uiOutput("co_c9_boxplot_ui")
+                ),
+                div(class = "plot-panel",
+                    div(class = "panel-title", uiOutput("co_age_title")),
+                    uiOutput("co_age_scatter_ui")
+                ),
+                div(class = "plot-panel",
+                    div(class = "panel-title", uiOutput("co_dur_title")),
+                    uiOutput("co_dur_scatter_ui")
+                )
+            ),
+            div(class = "plot-panel",
+                div(class = "panel-title", "Differential Expression Results Across Select Clinical Variables"),
+                uiOutput("co_deg_table_ui")
+            )
+        )
+    )
   ),
   
-  # ── JS ────────────────────────────────────────────────────
-  tags$script(HTML("
-    function switchTopTab(name) {
-      ['cvc','co'].forEach(function(t) {
-        document.getElementById('tab_'  + t).style.display = (t === name) ? 'block' : 'none';
-        document.getElementById('ttab_' + t).className = 'top-tab-btn' + (t === name ? ' active' : '');
-      });
-    }
-    document.addEventListener('keydown', function(e) {
-      if (e.key !== 'Enter') return;
-      if (document.activeElement.id === 'gene_input')
-        Shiny.setInputValue('go', Math.random());
-      if (document.activeElement.id === 'co_gene_input')
-        Shiny.setInputValue('co_go', Math.random());
-    });
-    Shiny.addCustomMessageHandler('toggleGeneError', function(msg) {
-      var el = document.getElementById('gene_error_msg');
-      if (el) el.style.display = msg.show ? 'block' : 'none';
-    });
-    Shiny.addCustomMessageHandler('toggleCoGeneError', function(msg) {
-      var el = document.getElementById('co_gene_error_msg');
-      if (el) el.style.display = msg.show ? 'block' : 'none';
-    });
-  "))
+  # Hidden input that holds the active tab — driven purely by Shiny
+  # actionButtons above write to this via updateTextInput in server
+  tags$div(style = "display:none",
+           textInput("active_tab", label = NULL, value = "cvc"))
 )
 
 # ── Server ────────────────────────────────────────────────────
 server <- function(input, output, session) {
   
-  # # ── Load data ONCE ──────────────────────────────────────
-  # tpm_long_data <- tryCatch(
-  #   #suppressMessages(tidy_tpm("data/tpm.csv", "data/metadata.csv")),
-  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data.rds")),
-  #   error = function(e) { message("TPM load error: ", e$message); NULL }
-  # )
-  # deg_all_data <- tryCatch(
-  #   #suppressMessages(load_deg_results("data/case_vs_control")),
-  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data.rds")),
-  #   error = function(e) { message("DEG load error: ", e$message); NULL }
-  # )
-  # case_only_data <- tryCatch(
-  #   #suppressMessages(load_case_only_results("data/case_only/")),
-  #   suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data.rds")),
-  #   error = function(e) { message("Case-only load error: ", e$message); list() }
-  # )
-  # 
-  # # ALS-only subset for case-only plots
-  # tpm_als_only <- if (!is.null(tpm_long_data) && "condition" %in% colnames(tpm_long_data))
-  #   dplyr::filter(tpm_long_data, condition == "ALS") else NULL
+  # ── Tab switching (no JS) ─────────────────────────────────
+  # Two invisible action buttons; pressing either updates the
+  # hidden text input that conditionalPanel reads.
+  output$tab_cvc_btn <- renderUI({
+    active <- isTRUE(input$active_tab == "cvc")
+    cls <- if (active) "tab-btn active" else "tab-btn"
+    actionButton("switch_cvc", "Case vs Control", class = cls)
+  })
+  output$tab_co_btn <- renderUI({
+    active <- isTRUE(input$active_tab == "co")
+    cls <- if (active) "tab-btn active" else "tab-btn"
+    actionButton("switch_co", "Case Only Analysis", class = cls)
+  })
+  
+  observeEvent(input$switch_cvc, {
+    updateTextInput(session, "active_tab", value = "cvc")
+  })
+  observeEvent(input$switch_co, {
+    updateTextInput(session, "active_tab", value = "co")
+  })
   
   # ── Tissue dropdown (case-only) — default to Cerebellum ──
   output$co_tissue_select_ui <- renderUI({
@@ -511,28 +524,13 @@ server <- function(input, output, session) {
                 selected = default_tissue, width = "100%")
   })
   
-
   # ════════════════════════════════════════════════════════
   # TAB 1 — Case vs Control
   # ════════════════════════════════════════════════════════
   
-  selected_gene <- eventReactive(list(input$go), {
+  selected_gene <- eventReactive(input$go, {
     trimws(toupper(input$gene_input))
   }, ignoreNULL = FALSE)
-  
-  observe({
-    g <- selected_gene()
-    if (is.null(tpm_long_data) || is.null(g) || g == "") return()
-    session$sendCustomMessage("toggleGeneError",
-                              list(show = !(g %in% tpm_long_data$gene)))
-  })
-  
-  # Suggest genes as user types
-  output$gene_datalist_options <- renderUI({
-    req(tpm_long_data)
-    genes <- sort(unique(tpm_long_data$symbol))
-    tagList(lapply(genes, function(g) tags$option(value = g)))
-  })
   
   output$data_status <- renderUI({
     items <- list()
@@ -563,7 +561,7 @@ server <- function(input, output, session) {
     if (is.null(g) || g == "" || is.null(tpm_long_data))
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
-                 tags$p("Enter a gene symbol and press Explore or hit Enter")))
+                 tags$p("Select a gene and press Explore")))
     plotOutput("boxplot", height = "350px")
   })
   
@@ -592,7 +590,7 @@ server <- function(input, output, session) {
     if (is.null(g) || g == "" || is.null(deg_all_data))
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4cb"),
-                 tags$p("Enter a gene symbol and press Explore to see DEG results")))
+                 tags$p("Select a gene and press Explore to see DEG results")))
     DTOutput("deg_table")
   })
   
@@ -625,18 +623,10 @@ server <- function(input, output, session) {
   # TAB 2 — Case Only Analysis
   # ════════════════════════════════════════════════════════
   
-  # ── fix: include co_tissue in trigger list + req() guard ──
   co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
     req(input$co_tissue)
     list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
-  
-  observe({
-    sel <- co_selected()
-    if (is.null(tpm_als_only) || is.null(sel$gene) || sel$gene == "") return()
-    session$sendCustomMessage("toggleCoGeneError",
-                              list(show = !(sel$gene %in% tpm_als_only$gene)))
-  })
   
   # ALS data filtered to selected gene + tissue
   co_gene_tissue_data <- reactive({
@@ -668,7 +658,7 @@ server <- function(input, output, session) {
     if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
-                 tags$p("Enter a gene and select a tissue to begin")))
+                 tags$p("Select a gene and tissue to begin")))
     plotOutput("co_c9_boxplot", height = "240px")
   })
   
@@ -707,7 +697,7 @@ server <- function(input, output, session) {
     )
     d <- dplyr::filter(d, !is.na(age_at_death))
     ggplot(d, aes(x = age_at_death, y = log2(tpm + 1))) +
-      geom_point(color = PAL_ALS, alpha = 0.7, size = 2.5) +
+      geom_point(color = "black", alpha = 0.7, size = 2.5) +
       geom_smooth(method = "lm", color = PAL_ACCENT, fill = PAL_ACCENT,
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Age at Death (years)", y = "log\u2082(TPM + 1)") +
@@ -732,7 +722,7 @@ server <- function(input, output, session) {
     )
     d <- dplyr::filter(d, !is.na(disease_duration))
     ggplot(d, aes(x = disease_duration, y = log2(tpm + 1))) +
-      geom_point(color = PAL_C9_YES, alpha = 0.7, size = 2.5) +
+      geom_point(color = "black", alpha = 0.7, size = 2.5) +
       geom_smooth(method = "lm", color = PAL_MUTED, fill = PAL_MUTED,
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Disease Duration (months)", y = "log\u2082(TPM + 1)") +
@@ -757,8 +747,8 @@ server <- function(input, output, session) {
     
     pull_tbl <- function(nm, label) {
       df <- case_only_data[[nm]]
+      if (is.null(df)) return(NULL)
       df <- data.frame(df)
-      #if (is.null(df)) return(NULL)
       df %>%
         dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
         dplyr::select(
@@ -768,7 +758,6 @@ server <- function(input, output, session) {
         ) %>%
         dplyr::mutate(Analysis = label, .before = 1) %>%
         dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4)))
-      
     }
     
     tbl <- dplyr::bind_rows(
