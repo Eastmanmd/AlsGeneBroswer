@@ -1,6 +1,6 @@
 # ============================================================
 #  ALS Differential Gene Expression Explorer — Shiny App
-#  Two tabs: Case vs Control | Case Only Analysis
+#  Two tabs: ALS vs Control | ALS Only Analysis
 #  No JavaScript — pure Shiny reactive tab switching
 # ============================================================
 
@@ -358,7 +358,7 @@ ui <- fluidPage(
   # Both panels are kept in the DOM; only visibility toggled via
   # CSS display so plots don't need to re-render on tab switch.
   
-  # TAB 1 — Case vs Control
+  # TAB 1 — ALS vs Control
   conditionalPanel(
     condition = "input.active_tab == 'cvc'",
     div(class = "main-layout",
@@ -417,7 +417,7 @@ ui <- fluidPage(
     )
   ),
   
-  # TAB 2 — Case Only Analysis
+  # TAB 2 — ALS Only Analysis
   conditionalPanel(
     condition = "input.active_tab == 'co'",
     div(class = "main-layout",
@@ -501,12 +501,12 @@ server <- function(input, output, session) {
   output$tab_cvc_btn <- renderUI({
     active <- isTRUE(input$active_tab == "cvc")
     cls <- if (active) "tab-btn active" else "tab-btn"
-    actionButton("switch_cvc", "Case vs Control", class = cls)
+    actionButton("switch_cvc", "ALS vs Control", class = cls)
   })
   output$tab_co_btn <- renderUI({
     active <- isTRUE(input$active_tab == "co")
     cls <- if (active) "tab-btn active" else "tab-btn"
-    actionButton("switch_co", "Case Only Analysis", class = cls)
+    actionButton("switch_co", "ALS Only Analysis", class = cls)
   })
   
   observeEvent(input$switch_cvc, {
@@ -525,7 +525,7 @@ server <- function(input, output, session) {
   })
   
   # ════════════════════════════════════════════════════════
-  # TAB 1 — Case vs Control
+  # TAB 1 — ALS vs Control
   # ════════════════════════════════════════════════════════
   
   selected_gene <- eventReactive(input$go, {
@@ -620,7 +620,7 @@ server <- function(input, output, session) {
   })
   
   # ════════════════════════════════════════════════════════
-  # TAB 2 — Case Only Analysis
+  # TAB 2 — ALS Only Analysis
   # ════════════════════════════════════════════════════════
   
   co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
@@ -729,7 +729,7 @@ server <- function(input, output, session) {
       als_theme()
   }, bg = PAL_PANEL)
   
-  # ── Case-only DEG table ──────────────────────────────────
+  # ── ALS-only DEG table ──────────────────────────────────
   output$co_deg_table_ui <- renderUI({
     sel <- co_selected()
     if (is.null(sel$gene) || sel$gene == "" || length(case_only_data) == 0)
@@ -767,7 +767,7 @@ server <- function(input, output, session) {
     )
     
     validate(need(nrow(tbl) > 0,
-                  paste0("'", g, "' not found in case-only DEG results for ", t, ".")))
+                  paste0("'", g, "' not found in ALS-only DEG results for ", t, ".")))
     
     datatable(tbl, rownames = FALSE,
               options = list(dom = "t", ordering = FALSE,
