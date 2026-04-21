@@ -453,9 +453,9 @@ ui <- fluidPage(
             div(class = "sidebar-section", style = "margin-top:26px",
                 tags$span(class = "sidebar-label", "C9orf72 Legend"),
                 div(class = "legend-item",
-                    div(class = "legend-dot", style = paste0("background:", PAL_C9_YES)), "C9orf72+"),
+                    div(class = "legend-dot", style = paste0("background:", PAL_C9_YES)), "C9+"),
                 div(class = "legend-item",
-                    div(class = "legend-dot", style = paste0("background:", PAL_C9_NO)),  "C9orf72\u2212")
+                    div(class = "legend-dot", style = paste0("background:", PAL_C9_NO)),  "C9\u2212")
             ),
             div(class = "sidebar-section",
                 tags$span(class = "sidebar-label", "Significance Thresholds"),
@@ -673,8 +673,8 @@ server <- function(input, output, session) {
     ggplot(d, aes(x = c9orf72, y = log2(tpm + 1), fill = c9orf72, color = c9orf72)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6, width = 0.45) +
       geom_jitter(width = 0.15, size = 2, alpha = 0.75) +
-      scale_fill_manual(values  = c("Yes" = PAL_C9_YES, "No" = PAL_C9_NO)) +
-      scale_color_manual(values = c("Yes" = PAL_C9_YES, "No" = PAL_C9_NO)) +
+      scale_fill_manual(values  = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
+      scale_color_manual(values = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
       labs(x = "C9orf72 Status", y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
       als_theme()
   }, bg = PAL_PANEL)
