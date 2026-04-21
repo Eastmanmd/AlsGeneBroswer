@@ -697,7 +697,7 @@ server <- function(input, output, session) {
     )
     d <- dplyr::filter(d, !is.na(age_at_death))
     ggplot(d, aes(x = age_at_death, y = log2(tpm + 1))) +
-      geom_point(color = "#C0392B", alpha = 0.7, size = 2.5) +
+      geom_point(color = "#C0392B", alpha = 0.7, size = 1.5) +
       geom_smooth(method = "lm", color = PAL_ACCENT, fill = PAL_ACCENT,
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Age at Death (years)", y = "log\u2082(TPM + 1)") +
@@ -722,7 +722,7 @@ server <- function(input, output, session) {
     )
     d <- dplyr::filter(d, !is.na(disease_duration))
     ggplot(d, aes(x = disease_duration, y = log2(tpm + 1))) +
-      geom_point(color = "#C0392B", alpha = 0.7, size = 2.5) +
+      geom_point(color = "#C0392B", alpha = 0.7, size = 1.5) +
       geom_smooth(method = "lm", color = PAL_MUTED, fill = PAL_MUTED,
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Disease Duration (months)", y = "log\u2082(TPM + 1)") +
