@@ -390,9 +390,9 @@ ui <- fluidPage(
             div(class = "sidebar-section",
                 tags$span(class = "sidebar-label", "Colour Legend"),
                 div(class = "legend-item",
-                    div(class = "legend-dot", style = paste0("background:", PAL_ALS)), "ALS"),
+                    div(class = "legend-dot", style = paste0("background:", PAL_CTRL)), "Control"),
                 div(class = "legend-item",
-                    div(class = "legend-dot", style = paste0("background:", PAL_CTRL)), "Control")
+                    div(class = "legend-dot", style = paste0("background:", PAL_ALS)), "ALS")
             ),
             div(class = "sidebar-section",
                 tags$span(class = "sidebar-label", "Significance Thresholds"),
