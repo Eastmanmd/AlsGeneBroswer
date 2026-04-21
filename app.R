@@ -577,7 +577,7 @@ server <- function(input, output, session) {
                    width = 0.55, position = position_dodge(0.7), color = "black") +
       geom_jitter(aes(group = condition),
                   position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
-                  size = 1.8, alpha = 0.75) +
+                  size = 1.5, alpha = 0.75) +
       scale_fill_manual(values  = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       scale_color_manual(values = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       labs(x = NULL, y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
@@ -672,7 +672,7 @@ server <- function(input, output, session) {
     d$c9orf72 <- factor(d$c9orf72)
     ggplot(d, aes(x = c9orf72, y = log2(tpm + 1), fill = c9orf72, color = c9orf72)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6, width = 0.45, color = "black") +
-      geom_jitter(width = 0.25, size = 2, alpha = 0.75) +
+      geom_jitter(width = 0.25, size = 1.5, alpha = 0.75) +
       scale_fill_manual(values  = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
       scale_color_manual(values = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
       labs(x = "C9orf72 Status", y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
