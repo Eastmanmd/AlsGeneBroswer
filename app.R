@@ -574,9 +574,9 @@ server <- function(input, output, session) {
     ggplot(gene_data,
            aes(x = tissue, y = log2(tpm + 1), fill = condition, color = condition)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6,
-                   width = 0.55, position = position_dodge(0.7)) +
+                   width = 0.55, position = position_dodge(0.7), color = "black") +
       geom_jitter(aes(group = condition),
-                  position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.7),
+                  position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
                   size = 1.8, alpha = 0.75) +
       scale_fill_manual(values  = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       scale_color_manual(values = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
