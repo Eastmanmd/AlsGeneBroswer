@@ -609,13 +609,44 @@ server <- function(input, output, session) {
       tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
       dplyr::rename(` ` = Metric)
     validate(need(nrow(tbl) > 0, paste0("'", g, "' not found in DEG results.")))
-    datatable(tbl, rownames = FALSE,
+    
+    # datatable(tbl, rownames = FALSE,
+    #           options = list(dom = "t", ordering = FALSE,
+    #                          columnDefs = list(list(className = "dt-center",
+    #                                                 targets = seq_len(ncol(tbl) - 1)))),
+    #           class = "display compact") %>%
+    #   formatStyle(" ", target = "row",
+    #               backgroundColor = styleEqual("FDR", "rgba(26,122,74,0.06)"))
+    
+    ## ----------- Test new formating option to color LFC to match theme
+    
+    tissue_cols <- setdiff(colnames(tbl), " ")
+    
+    tbl_display <- tbl %>%
+      mutate(across(all_of(tissue_cols), ~ {
+        val   <- suppressWarnings(as.numeric(.x))
+        label <- tbl[[" "]][row_number()]
+        dplyr::case_when(
+          label == "log2FC" & !is.na(val) & val < -1 ~
+            paste0('<span style="color:', PAL_CTRL, '">', sprintf("%.2f", val), '</span>'),
+          label == "log2FC" & !is.na(val) & val >  1 ~
+            paste0('<span style="color:', PAL_ALS,  '">', sprintf("%.2f", val), '</span>'),
+          label == "log2FC" & !is.na(val) ~
+            paste0('<span style="color:', PAL_MUTED, '">', sprintf("%.2f", val), '</span>'),
+          (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~
+            paste0('<span style="font-weight:600">', sprintf("%.2f", val), '</span>'),
+          TRUE ~ .x
+        )
+      }))
+    
+    datatable(tbl_display, rownames = FALSE, escape = FALSE,
               options = list(dom = "t", ordering = FALSE,
                              columnDefs = list(list(className = "dt-center",
-                                                    targets = seq_len(ncol(tbl) - 1)))),
-              class = "display compact") %>%
-      formatStyle(" ", target = "row",
-                  backgroundColor = styleEqual("FDR", "rgba(26,122,74,0.06)"))
+                                                    targets = seq_len(ncol(tbl_display) - 1)))),
+              class = "display compact")
+    
+  ## ---------------------------------------------------------------------------
+    
   })
   
   # ════════════════════════════════════════════════════════
