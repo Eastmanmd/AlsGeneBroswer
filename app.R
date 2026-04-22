@@ -349,8 +349,9 @@ ui <- fluidPage(
   
   # ── Pure-Shiny tab bar ────────────────────────────────────
   div(class = "tab-bar",
-      uiOutput("tab_cvc_btn"),
-      uiOutput("tab_co_btn")
+      uiOutput("tab_about_btn"), # About tab
+      uiOutput("tab_cvc_btn"), # ALS vs Control
+      uiOutput("tab_co_btn") # ALS only analysis
   ),
   
   # ── Active tab content (conditionalPanel — always rendered) ──
@@ -485,6 +486,133 @@ ui <- fluidPage(
     )
   ),
   
+  # TAB 1 — About App Tab
+  conditionalPanel(
+    condition = "input.active_tab == 'about'",
+    div(style = paste0("background:", PAL_BG, "; min-height: calc(100vh - 113px);
+                      padding: 48px 64px; max-width: 900px; margin: 0 auto;"),
+        
+        # ── App Overview ─────────────────────────────────────
+        div(style = "margin-bottom: 40px;",
+            div(class = "panel-title", "ABOUT THIS APP"),
+            div(class = "plot-panel",
+                tags$h3(style = paste0("font-family:'Open Sans',monospace; font-size:16px;
+                                font-weight:700; color:", PAL_TEXT, "; margin-bottom:12px;"),
+                        "ALS Gene Expression Explorer"),
+                tags$p(style = paste0("color:", PAL_TEXT, "; font-size:15px; line-height:1.75;"),
+                       "This interactive browser enables exploration of differential gene expression
+           across multiple tissues in Amyotrophic Lateral Sclerosis (ALS). Users can
+           query any gene to visualize expression differences between ALS cases and
+           controls, examine associations with clinical variables including C9orf72
+           mutation status, age at death, and disease duration, and review full
+           differential expression statistics across tissues."
+                ),
+                tags$br(),
+                tags$p(style = paste0("color:", PAL_TEXT, "; font-size:15px; line-height:1.75;"),
+                       "The app is organized into two  views:"
+                ),
+                tags$ul(style = paste0("color:", PAL_TEXT, "; font-size:15px;
+                                line-height:2; margin-left:20px;"),
+                        tags$li(tags$b("Case vs Control:"),
+                                " Boxplots and DEG statistics comparing ALS samples (bulk RNA-seq expression) to healthy controls
+              across all available tissues."),
+                        tags$li(tags$b("Case Only Analysis:"),
+                                " Expression scatter plots and DEG results within ALS cases, stratified
+              by C9orf72 mutation status, age at death, and disease duration.")
+                )
+            )
+        ),
+        
+        # ── Study Goal ───────────────────────────────────────
+        div(style = "margin-bottom: 40px;",
+            div(class = "panel-title", "STUDY GOAL"),
+            div(class = "plot-panel",
+                tags$p(style = paste0("color:", PAL_TEXT, "; font-size:15px; line-height:1.75;"),
+                       "Amyotrophic lateral sclerosis (ALS) is a devastating neurodegenerative disease with substantial genetic and clinical heterogeneity that impedes therapeutic development. 
+                       Large-scale multi-tissue genomic resources have transformed the study of neuropsychiatric and neurodegenerative diseases, but no equivalent resource exists for ALS. 
+                       Here we present the full NYGC ALS Consortium dataset, combining whole-genome sequencing from 4,746 donors and 
+                       bulk RNA-seq from 2,574 samples across 8 brain and spinal cord regions from 695 donors across the ALS disease spectrum. 
+                       Our catalogue of small variants, structural variants, and short tandem repeats identified likely pathogenic mutations in 21.9% of ALS cases. 
+                       Gene expression and mRNA splicing analysis across 5 major tissues reveals shared and region-specific features, highlighting microglial and T-cell dysregulation in the spinal cord. 
+                       Mapping the genetic regulation of expression and splicing across tissues identified associations with 6 ALS risk loci, 
+                       whereas allele-specific rare variant analysis detected expression effects for C9orf72 and OPTN. All data are immediately publicly available."
+                ),
+                tags$br(),
+                tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
+                       "Pre-print available at:"
+                ),
+                tags$a(
+                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  target = "_blank",
+                  style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
+                           font-weight:600; text-decoration:none;"),
+                  "\U0001f517  https://doi.org/XXXXXXX"
+                ),
+                tags$br(),
+                tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
+                       "Code available at:"
+                ),
+                tags$a(
+                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  target = "_blank",
+                  style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
+                           font-weight:600; text-decoration:none;"),
+                  "\U0001f517  https://github.com/XXXXXXX"
+                ),
+                tags$br(),
+                tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
+                       "Full data available at:"
+                ),
+                tags$a(
+                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  target = "_blank",
+                  style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
+                           font-weight:600; text-decoration:none;"),
+                  "\U0001f517  https://zenodo.com/XXXXXXX"
+                ),
+            )
+        ),
+        
+        # ── Team ─────────────────────────────────────────────
+        div(style = "margin-bottom: 40px;",
+            div(class = "panel-title", "APP DEVELOPMENT"),
+            div(class = "plot-panel",
+                tags$p(style = paste0("color:", PAL_MUTED, "; font-size:12px;
+                               letter-spacing:0.08em; text-transform:uppercase;
+                               margin-bottom:16px;"),
+                       "Written & Designed By"),
+                # Developer card
+                div(style = paste0("display:flex; align-items:flex-start; gap:16px;
+                            padding:16px; background:", PAL_BG, ";
+                            border-radius:8px; border:1px solid ", PAL_BORDER, ";"),
+                    div(style = paste0("width:44px; height:44px; border-radius:50%; flex-shrink:0;
+                              background:linear-gradient(135deg,", PAL_ALS, ",", PAL_C9_YES, ");
+                              display:flex; align-items:center; justify-content:center;
+                              color:#fff; font-weight:700; font-size:16px;"),
+                        "AO"),   # initials
+                    div(
+                      tags$p(style = paste0("font-weight:700; color:", PAL_TEXT, ";
+                                   font-size:15px; margin-bottom:4px;"),
+                             "Ali Oku"),
+                      tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;
+                                   line-height:1.6;"),
+                             "Bioinformatics Analyst, Computational Biology"),
+                      tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;"),
+                             "New York Genome Center (NYGC)")
+                    )
+                )
+            )
+        ),
+        
+        # ── Footer ───────────────────────────────────────────
+        tags$hr(style = paste0("border:none; border-top:1px solid ", PAL_BORDER, ";
+                            margin-bottom:16px;")),
+        tags$p(style = paste0("color:", PAL_MUTED, "; font-size:12px; text-align:center;"),
+               paste0("\u00a9 ", format(Sys.Date(), "%Y"),
+                      " New York Genome Center \u00b7 ALS Consortium"))
+    )
+  ),
+  
   # Hidden input that holds the active tab — driven purely by Shiny
   # actionButtons above write to this via updateTextInput in server
   tags$div(style = "display:none",
@@ -524,7 +652,20 @@ server <- function(input, output, session) {
   })
   
   # ════════════════════════════════════════════════════════
-  # TAB 1 — ALS vs Control
+  # TAB 1 — About the app
+  # ════════════════════════════════════════════════════════
+  output$tab_about_btn <- renderUI({
+    active <- isTRUE(input$active_tab == "about")
+    cls <- if (active) "tab-btn active" else "tab-btn"
+    actionButton("switch_about", "About", class = cls)
+  })
+  
+  observeEvent(input$switch_about, {
+    updateTextInput(session, "active_tab", value = "about")
+  })
+  
+  # ════════════════════════════════════════════════════════
+  # TAB 2 — ALS vs Control
   # ════════════════════════════════════════════════════════
   
   selected_gene <- eventReactive(input$go, {
@@ -650,7 +791,7 @@ server <- function(input, output, session) {
   })
   
   # ════════════════════════════════════════════════════════
-  # TAB 2 — ALS Only Analysis
+  # TAB 3 — ALS Only Analysis
   # ════════════════════════════════════════════════════════
   
   co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
