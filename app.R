@@ -255,7 +255,7 @@ app_css <- sprintf("
     letter-spacing: 0.1em; color: %s; margin-bottom: 16px;
   }
   .plots-grid-3 {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1600px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1600px; max-height: 600px;
   }
 
   /* DataTables */
@@ -265,7 +265,6 @@ app_css <- sprintf("
     border-bottom: 1px solid %s !important;
     font-family: 'Open Sans', monospace !important;
     font-size: 12px !important; letter-spacing: 0.08em !important;
-    text-transform: uppercase !important;
   }
   table.dataTable tbody tr { background: %s !important; }
   table.dataTable tbody tr:nth-child(even) { background: #F8F9FA !important; }
@@ -659,7 +658,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f9ec"),
                  tags$p("Select a gene and tissue to begin")))
-    plotOutput("co_c9_boxplot", height = "240px")
+    plotOutput("co_c9_boxplot", height = "350px")
   })
   
   output$co_c9_boxplot <- renderPlot({
@@ -686,7 +685,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
-    plotOutput("co_age_scatter", height = "240px")
+    plotOutput("co_age_scatter", height = "350px")
   })
   
   output$co_age_scatter <- renderPlot({
@@ -711,7 +710,7 @@ server <- function(input, output, session) {
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
-    plotOutput("co_dur_scatter", height = "240px")
+    plotOutput("co_dur_scatter", height = "350px")
   })
   
   output$co_dur_scatter <- renderPlot({
