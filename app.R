@@ -406,6 +406,7 @@ ui <- fluidPage(
                     openOnFocus      = FALSE,
                     highlight        = TRUE,
                     closeAfterSelect = TRUE,
+                    create           = FALSE,
                     plugins          = list("clear_button")
                   ),
                   width = "100%"
@@ -464,6 +465,7 @@ ui <- fluidPage(
                     openOnFocus      = FALSE,
                     highlight        = TRUE,
                     closeAfterSelect = TRUE,
+                    create           = FALSE,
                     plugins          = list("clear_button")
                   ),
                   width = "100%"
@@ -710,9 +712,15 @@ server <- function(input, output, session) {
   # TAB 2 — ALS vs Control
   # ════════════════════════════════════════════════════════
   
-  selected_gene <- eventReactive(input$go, {
-    trimws(toupper(input$gene_input))
-  }, ignoreNULL = FALSE)
+  # selected_gene <- eventReactive(input$go, {
+  #   trimws(toupper(input$gene_input))
+  # }, ignoreNULL = FALSE)
+  
+  selected_gene <- reactive({
+    g <- trimws(toupper(input$gene_input))
+    req(g != "", g %in% all_genes)   
+    g
+  })
   
   output$data_status <- renderUI({
     items <- list()
@@ -838,10 +846,17 @@ server <- function(input, output, session) {
   # TAB 3 — ALS Only Analysis
   # ════════════════════════════════════════════════════════
   
-  co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
+  # co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
+  #   req(input$co_tissue)
+  #   list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
+  # }, ignoreNULL = TRUE, ignoreInit = TRUE)
+  
+  co_selected <- reactive({
     req(input$co_tissue)
-    list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
-  }, ignoreNULL = TRUE, ignoreInit = TRUE)
+    g <- trimws(toupper(input$co_gene_input))
+    req(g != "", g %in% all_genes)
+    list(gene = g, tissue = input$co_tissue)
+  })
   
   # ALS data filtered to selected gene + tissue
   co_gene_tissue_data <- reactive({
