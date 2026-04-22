@@ -248,32 +248,48 @@ app_css <- sprintf("
     background: %s; border: 1px solid %s;
     border-radius: 10px; padding: 20px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    max-width: 1600px;
   }
-  .plot-panel-boxplot { max-height: 600px; overflow: hidden; }
+  .plot-panel-boxplot { max-height: 600px; overflow: hidden; max-width: 1600px;}
   .panel-title {
     font-family: 'Open Sans', monospace; font-size: 12px; font-weight: 700;
     letter-spacing: 0.1em; color: %s; margin-bottom: 16px;
   }
   .plots-grid-3 {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; max-width: 1600px; max-height: 600px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; 
+    gap: 20px; 
+    max-width: 1600px; 
+    max-height: 600px;
   }
 
   /* DataTables */
-  .dataTables_wrapper { color: %s !important; font-size: 15px; }
+  .dataTables_wrapper { color: %s !important; font-size: 15px; max-width: 1600px;}
   table.dataTable thead th {
     background: %s !important; color: %s !important;
     border-bottom: 1px solid %s !important;
     font-family: 'Open Sans', monospace !important;
     font-size: 12px !important; letter-spacing: 0.08em !important;
+    max-width: 1600px !important;
   }
   table.dataTable tbody tr { background: %s !important; }
   table.dataTable tbody tr:nth-child(even) { background: #F8F9FA !important; }
   table.dataTable tbody tr:hover { background: #EAF4FB !important; }
   table.dataTable tbody td { border-top: 1px solid %s !important; color: %s !important; }
+  
+  /* The scroll body div DT injects when scrollX is enabled */
+  .dataTables_wrapper .dataTables_scroll,
+  .dataTables_wrapper .dataTables_scrollBody,
+  .dataTables_wrapper .dataTables_scrollHead {
+    max-width: 1600px !important;
+    overflow-x: auto !important;
+  }
+
+
   .dataTables_filter input, .dataTables_length select {
     background: %s !important; border: 1px solid %s !important;
     color: %s !important; border-radius: 4px; padding: 4px 8px;
   }
+
   .dataTables_info, .dataTables_paginate { color: %s !important; }
   .paginate_button { color: %s !important; }
   .paginate_button.current { background: rgba(41,128,185,0.12) !important; border-radius: 4px; }
@@ -513,10 +529,10 @@ ui <- fluidPage(
                 ),
                 tags$ul(style = paste0("color:", PAL_TEXT, "; font-size:15px;
                                 line-height:2; margin-left:20px;"),
-                        tags$li(tags$b("Case vs Control:"),
+                        tags$li(tags$b("ALS vs Control:"),
                                 " Boxplots and DEG statistics comparing ALS samples (bulk RNA-seq expression) to healthy controls
               across all available tissues."),
-                        tags$li(tags$b("Case Only Analysis:"),
+                        tags$li(tags$b("ALS Only Analysis:"),
                                 " Expression scatter plots and DEG results within ALS cases, stratified
               by C9orf72 mutation status, age at death, and disease duration.")
                 )
@@ -525,7 +541,7 @@ ui <- fluidPage(
         
         # ── Study Goal ───────────────────────────────────────
         div(style = "margin-bottom: 40px;",
-            div(class = "panel-title", "STUDY GOAL"),
+            div(class = "panel-title", "ABSTRACT"),
             div(class = "plot-panel",
                 tags$p(style = paste0("color:", PAL_TEXT, "; font-size:15px; line-height:1.75;"),
                        "Amyotrophic lateral sclerosis (ALS) is a devastating neurodegenerative disease with substantial genetic and clinical heterogeneity that impedes therapeutic development. 
@@ -780,8 +796,10 @@ server <- function(input, output, session) {
         )
       }))
     
-    datatable(tbl_display, rownames = FALSE, escape = FALSE,
-              options = list(dom = "t", ordering = FALSE,
+    datatable(tbl_display, rownames = FALSE, escape = FALSE, width = "100%",
+              options = list(dom = "t", 
+                             ordering = FALSE,
+                             scrollX   = FALSE,
                              columnDefs = list(list(className = "dt-center",
                                                     targets = seq_len(ncol(tbl_display) - 1)))),
               class = "display compact")
