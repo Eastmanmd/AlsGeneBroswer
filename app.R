@@ -241,7 +241,7 @@ app_css <- sprintf("
   }
 
   .main-content {
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; align-items: stretch;
     overflow-y: auto; background: %s; padding: 24px; gap: 24px;
   }
   .plot-panel {
@@ -249,8 +249,10 @@ app_css <- sprintf("
     border-radius: 10px; padding: 20px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     max-width: 1600px;
+    width: 100%%;
+    margin: 0 auto;
   }
-  .plot-panel-boxplot { max-height: 600px; overflow: hidden; max-width: 1600px;}
+  .plot-panel-boxplot { max-height: 600px; overflow: hidden; width: 100%%; max-width: 1600px; margin: 0 auto;}
   .panel-title {
     font-family: 'Open Sans', monospace; font-size: 12px; font-weight: 700;
     letter-spacing: 0.1em; color: %s; margin-bottom: 16px;
@@ -259,7 +261,17 @@ app_css <- sprintf("
     display: grid; grid-template-columns: 1fr 1fr 1fr; 
     gap: 20px; 
     max-width: 1600px; 
+    width: 100%%;
     max-height: 600px;
+    margin: 0 auto;
+  }
+  
+  /* prevent individual panels inside the grid from overriding grid sizing */
+  .plots-grid-3 > .plot-panel {
+    max-width: 100%%;
+    width: 100%%;
+    margin: 0;
+    min-width: 0;    /* critical — prevents grid blowout */
   }
 
   /* DataTables */
@@ -506,7 +518,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "input.active_tab == 'about'",
     div(style = paste0("background:", PAL_BG, "; min-height: calc(100vh - 113px);
-                      padding: 48px 64px; max-width: 900px; margin: 0 auto;"),
+                      padding: 48px 64px; max-width: 1200px; margin: 0 auto;"),
         
         # ── App Overview ─────────────────────────────────────
         div(style = "margin-bottom: 40px;",
@@ -958,8 +970,9 @@ server <- function(input, output, session) {
     validate(need(nrow(tbl) > 0,
                   paste0("'", g, "' not found in ALS-only DEG results for ", t, ".")))
     
-    datatable(tbl, rownames = FALSE,
+    datatable(tbl, rownames = FALSE, width = "100%",
               options = list(dom = "t", ordering = FALSE,
+                             scrollX   = FALSE,
                              columnDefs = list(list(className = "dt-center", targets = 1:3))),
               class = "display compact") %>%
       formatStyle("FDR",
