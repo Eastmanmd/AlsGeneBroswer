@@ -583,18 +583,19 @@ ui <- fluidPage(
                        "Code available at:"
                 ),
                 tags$a(
-                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  href   = "https://github.com/Eastmanmd/AlsGeneBroswer/",   # <-- replace with Github link 
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
-                  "\U0001f517  https://github.com/XXXXXXX"
+                  icon("github", class = "fa-lg"),
+                  " https://github.com/Eastmanmd/AlsGeneBroswer/"
                 ),
                 tags$br(),
                 tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
                        "Full data available at:"
                 ),
                 tags$a(
-                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  href   = "https://zenodo.com/XXXXXXX",   # <-- replace with link to zenodo
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
@@ -612,27 +613,32 @@ ui <- fluidPage(
                                margin-bottom:16px;"),
                        "Written & Designed By"),
                 # Developer card
-                div(style = paste0("display:flex; align-items:flex-start; gap:16px;
+                tags$a(
+                  href = "https://www.linkedin.com/in/ali-eastman-oku/", 
+                  target = "_blank",  # opens in new tab
+                  style = "text-decoration:none;",
+                  
+                  div(style = paste0("display:flex; align-items:flex-start; gap:16px;
                             padding:16px; background:", PAL_BG, ";
                             border-radius:8px; border:1px solid ", PAL_BORDER, ";"),
-                    div(style = paste0("width:44px; height:44px; border-radius:50%; flex-shrink:0;
+                      div(style = paste0("width:44px; height:44px; border-radius:50%; flex-shrink:0;
                               background:linear-gradient(135deg,", PAL_ALS, ",", PAL_C9_YES, ");
                               display:flex; align-items:center; justify-content:center;
                               color:#fff; font-weight:700; font-size:16px;"),
-                        "AO"),   # initials
-                    div(
-                      tags$p(style = paste0("font-weight:700; color:", PAL_TEXT, ";
+                          "AO"),  
+                      div(
+                        tags$p(style = paste0("font-weight:700; color:", PAL_TEXT, ";
                                    font-size:15px; margin-bottom:4px;"),
-                             "Ali Oku"),
-                      tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;
+                               "Ali Oku"),
+                        tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;
                                    line-height:1.6;"),
-                             "Bioinformatics Analyst, Computational Biology"),
-                      tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;"),
-                             "New York Genome Center (NYGC)")
-                    )
-                )
-            )
-        ),
+                               "Bioinformatics Analyst, Computational Biology"),
+                        tags$p(style = paste0("color:", PAL_MUTED, "; font-size:13px;"),
+                               "New York Genome Center (NYGC)")
+                      )
+                  )
+                ))
+            ),
         
         # ── Footer ───────────────────────────────────────────
         tags$hr(style = paste0("border:none; border-top:1px solid ", PAL_BORDER, ";
