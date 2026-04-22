@@ -397,8 +397,8 @@ ui <- fluidPage(
                 selectizeInput(
                   "gene_input",
                   label   = NULL,
-                  choices = all_genes,
-                  selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+                  choices = NULL, #all_genes,
+                  selected = NULL, #if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
                   options = list(
                     placeholder      = "e.g. SOD1",
                     maxOptions       = 50,
@@ -455,8 +455,8 @@ ui <- fluidPage(
                 selectizeInput(
                   "co_gene_input",
                   label    = NULL,
-                  choices  = all_genes,
-                  selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+                  choices  = NULL, #all_genes,
+                  selected = NULL, #if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
                   options  = list(
                     placeholder      = "e.g. SOD1",
                     maxOptions       = 50,
@@ -678,6 +678,20 @@ server <- function(input, output, session) {
     selectInput("co_tissue", label = NULL, choices = tissues,
                 selected = default_tissue, width = "100%")
   })
+  
+  updateSelectizeInput(
+    session, "gene_input",
+    choices  = all_genes,
+    selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+    server   = TRUE          # loads options on demand rather than all at once
+  )
+  
+  updateSelectizeInput(
+    session, "co_gene_input",
+    choices  = all_genes,
+    selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
+    server   = TRUE
+  )
   
   # ════════════════════════════════════════════════════════
   # TAB 1 — About the app
