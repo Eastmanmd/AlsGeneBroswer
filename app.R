@@ -371,7 +371,7 @@ ui <- fluidPage(
                style = "object-fit: contain; flex-shrink: 0;"),
       div(
         tags$h1("ALS Gene Expression Explorer"),
-        div(class = "subtitle", "Amyotrophic lateral sclerosis (ALS) Multi-tissue DEG Analysis")
+        div(class = "subtitle", "Amyotrophic Lateral Sclerosis (ALS) Multi-Tissue DEG Analysis")
       )
   ),
   
