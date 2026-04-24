@@ -16,7 +16,7 @@ The ALS Gene Browser provides an accessible, point-and-click interface for resea
 
 | Feature | Details |
 |---|---|
-| Data types | RNA-seq, WGS |
+| Data types | RNA-seq,  clinical metadata|
 | Sample types | Post-mortem human tissue |
 | Groups | ALS cases, Neurologically normal controls |
 | Contributing sites | 41 sites across the NYGC ALS Consortium |
@@ -24,11 +24,11 @@ The ALS Gene Browser provides an accessible, point-and-click interface for resea
 
 ### Tissues
 
-1. Motor Cortex
-2. Frontal Cortex
-3. Cervical Spinal Cord
-4. Lumbar Spinal Cord
-5. Cerebellum
+1. Motor Cortex (MCX)
+2. Frontal Cortex (FCX)
+3. Cervical Spinal Cord (CSC)
+4. Lumbar Spinal Cord (LSC)
+5. Cerebellum (CBL)
 
 ---
 
@@ -41,7 +41,7 @@ The browser is organized into **two main tabs**
 ## Tab 1 — ALS vs. Control Differential Expression
 
 ### Purpose
-Explore differential gene expression (DEG) results comparing **ALS patients to neurologically normal controls** across all five tissues.
+Explore differential gene expression (DEG) results comparing gene expression data from **ALS samples to neurologically normal controls** across all five tissues.
 
 ### How to Use
 
@@ -52,22 +52,24 @@ Explore differential gene expression (DEG) results comparing **ALS patients to n
 
 #### Boxplot
 - Displays normalized expression of the selected gene across ALS and control samples, faceted by tissue.
-- Allows rapid visual comparison of expression differences and within-group variability.
 
 #### DEG Results Table
 - Summary of differential expression statistics for the queried gene in each tissue.
-- Includes fold change, p-value, adjusted p-value (FDR), and direction of effect.
+- Includes fold change (LFC), p-value, adjusted p-value (FDR), and direction of effect.
+- DEG includes covariate selection (see paper)
+- A positive LFC shows higher gene expression in ALS cases compared to controls.
+- A negative LFC shows higher genne expression in controls compared to ALS cases. 
 
 ### Statistical Approach
-- DEG analysis was performed using **robust covariates** to account for sample collection across multiple contributing sites.
-- Covariate correction mitigates batch effects introduced by cross-site variability in sample handling, RNA extraction, and sequencing.
+- DEG analysis was performed using **robust covariates** to account for sample collection across multiple contributing sites. (see paper)
+- Covariate correction mitigates batch effects introduced by cross-site variability in sample handling, RNA extraction, and sequencing. (see paper)
 
 ---
 
 ## Tab 2 — Case-Only Analysis (C9orf72 & Clinical Variables)
 
 ### Purpose
-Explore gene expression patterns **within ALS cases only**, stratified by *C9orf72* repeat expansion status and correlated with key clinical variables.
+Explore gene expression patterns **within ALS cases **, stratified by *C9orf72* repeat expansion status and correlated with key clinical variables including age at symptom onset and disease duration. 
 
 ### How to Use
 
@@ -105,11 +107,9 @@ Explore gene expression patterns **within ALS cases only**, stratified by *C9orf
 ALS_Gene_Browser/
 ├── app.R                  # Main Shiny application (or ui.R + server.R)
 ├── data/
-│   ├── deg_als_vs_ctrl/   # DEG results: ALS vs. Control (Tab 1)
-│   ├── deg_c9_status/     # DEG results: C9orf72 pos vs. neg (Tab 2)
-│   ├── deg_age_at_death/  # DEG results: Age at death association (Tab 2)
-│   ├── deg_disease_dur/   # DEG results: Disease duration association (Tab 2)
-│   └── normalized_counts/ # Normalized expression matrices per tissue
+│   ├── deg_als_vs_ctrl.rds   # DEG results: ALS vs. Control (Tab 1)
+│   ├── deg_case_only_results.rds     # DEG results: C9orf72 pos vs. neg (Tab 2)
+│   └── tpm_data.rds # Normalized expression across all samples
 └── README.md
 ```
 
