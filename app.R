@@ -107,15 +107,15 @@ als_theme <- function() {
 
 # ── Load data ONCE ──────────────────────────────────────
 tpm_long_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor.rds")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor_final.rds")),
   error = function(e) { message("TPM load error: ", e$message); NULL }
 )
 deg_all_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data_subset.rds")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data_subset_final.rds")),
   error = function(e) { message("DEG load error: ", e$message); NULL }
 )
 case_only_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data_subset.rds")),
+  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data_subset_final.rds")),
   error = function(e) { message("Case-only load error: ", e$message); list() }
 )
 
@@ -595,7 +595,7 @@ ui <- fluidPage(
                        "Full data available at:"
                 ),
                 tags$a(
-                  href   = "https://zenodo.com/XXXXXXX",   # <-- replace with link to zenodo
+                  href   = "https://zenodo.org/XXXXXXX",   # <-- replace with link to zenodo
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
@@ -614,7 +614,7 @@ ui <- fluidPage(
                        "Written & Designed By"),
                 # Developer card
                 tags$a(
-                  href = "https://www.linkedin.com/in/ali-eastman-oku/", 
+                  href = "https://github.com/Eastmanmd/", 
                   target = "_blank",  # opens in new tab
                   style = "text-decoration:none;",
                   
@@ -801,7 +801,7 @@ server <- function(input, output, session) {
         `p-value`= dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
         `FDR`    = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
       ) %>%
-      dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4))) %>%
+      dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3))) %>%
       tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
       tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
       dplyr::rename(` ` = Metric)
@@ -823,16 +823,27 @@ server <- function(input, output, session) {
       mutate(across(all_of(tissue_cols), ~ {
         val   <- suppressWarnings(as.numeric(.x))
         label <- tbl[[" "]][row_number()]
+        # dplyr::case_when(
+        #   label == "log2FC" & !is.na(val) & val < -1 ~
+        #     paste0('<span style="color:', PAL_CTRL, '">', sprintf("%.2f", val), '</span>'),
+        #   label == "log2FC" & !is.na(val) & val >  1 ~
+        #     paste0('<span style="color:', PAL_ALS,  '">', sprintf("%.2f", val), '</span>'),
+        #   label == "log2FC" & !is.na(val) ~
+        #     paste0('<span style="color:', PAL_MUTED, '">', sprintf("%.2f", val), '</span>'),
+        #   (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~
+        #     paste0('<span style="font-weight:600">', sprintf("%.2f", val), '</span>'),
+        #   TRUE ~ .x
+        # )
         dplyr::case_when(
           label == "log2FC" & !is.na(val) & val < -1 ~
-            paste0('<span style="color:', PAL_CTRL, '">', sprintf("%.2f", val), '</span>'),
+            paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
           label == "log2FC" & !is.na(val) & val >  1 ~
-            paste0('<span style="color:', PAL_ALS,  '">', sprintf("%.2f", val), '</span>'),
+            paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
           label == "log2FC" & !is.na(val) ~
-            paste0('<span style="color:', PAL_MUTED, '">', sprintf("%.2f", val), '</span>'),
+            paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
           (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~
-            paste0('<span style="font-weight:600">', sprintf("%.2f", val), '</span>'),
-          TRUE ~ .x
+            paste0('<span style="font-weight:600">', val, '</span>'),
+          TRUE ~ as.character(val)
         )
       }))
     
