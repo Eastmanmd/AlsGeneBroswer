@@ -107,15 +107,15 @@ als_theme <- function() {
 
 # ── Load data ONCE ──────────────────────────────────────
 tpm_long_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/tpm_long_data_factor_final.rds")),
+  suppressMessages(readRDS("./data/tpm_long_data_factor_final.rds")),
   error = function(e) { message("TPM load error: ", e$message); NULL }
 )
 deg_all_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/deg_all_data_subset_final.rds")),
+  suppressMessages(readRDS("./data/deg_all_data_subset_final.rds")),
   error = function(e) { message("DEG load error: ", e$message); NULL }
 )
 case_only_data <- tryCatch(
-  suppressMessages(readRDS("/gpfs/commons/projects/ALS_Consortium_analysis/compbio/als_browser/als_shiny_browser/data/case_only_data_subset_final.rds")),
+  suppressMessages(readRDS("./data/case_only_data_subset_final.rds")),
   error = function(e) { message("Case-only load error: ", e$message); list() }
 )
 

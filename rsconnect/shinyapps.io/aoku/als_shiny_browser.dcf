@@ -1,0 +1,12 @@
+name: als_shiny_browser
+title: als_shiny_browser
+username: aoku
+account: aoku
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17266972
+bundleId: 11929621
+url: https://aoku.shinyapps.io/als_shiny_browser/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
