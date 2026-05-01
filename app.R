@@ -406,8 +406,8 @@ ui <- fluidPage(
                     openOnFocus      = FALSE,
                     highlight        = TRUE,
                     closeAfterSelect = TRUE,
-                    create           = FALSE,
-                    plugins          = list("clear_button")
+                    create           = FALSE
+                    #plugins          = list("clear_button")
                   ),
                   width = "100%"
                 ),
@@ -465,8 +465,8 @@ ui <- fluidPage(
                     openOnFocus      = FALSE,
                     highlight        = TRUE,
                     closeAfterSelect = TRUE,
-                    create           = FALSE,
-                    plugins          = list("clear_button")
+                    create           = FALSE
+                    #plugins          = list("clear_button")
                   ),
                   width = "100%"
                 ),
@@ -558,21 +558,21 @@ ui <- fluidPage(
             div(class = "panel-title", "ABSTRACT"),
             div(class = "plot-panel",
                 tags$p(style = paste0("color:", PAL_TEXT, "; font-size:15px; line-height:1.75;"),
-                       "Amyotrophic lateral sclerosis (ALS) is a devastating neurodegenerative disease with substantial genetic and clinical heterogeneity that impedes therapeutic development. 
-                       Large-scale multi-tissue genomic resources have transformed the study of neuropsychiatric and neurodegenerative diseases, but no equivalent resource exists for ALS. 
-                       Here we present the full NYGC ALS Consortium dataset, combining whole-genome sequencing from 4,746 donors and 
-                       bulk RNA-seq from 2,574 samples across 8 brain and spinal cord regions from 695 donors across the ALS disease spectrum. 
-                       Our catalogue of small variants, structural variants, and short tandem repeats identified likely pathogenic mutations in 21.9% of ALS cases. 
-                       Gene expression and mRNA splicing analysis across 5 major tissues reveals shared and region-specific features, highlighting microglial and T-cell dysregulation in the spinal cord. 
-                       Mapping the genetic regulation of expression and splicing across tissues identified associations with 6 ALS risk loci, 
-                       whereas allele-specific rare variant analysis detected expression effects for C9orf72 and OPTN. All data are immediately publicly available."
+                       "Amyotrophic lateral sclerosis (ALS) is a devastating neurodegenerative disease with substantial genetic and clinical heterogeneity that impedes 
+                       therapeutic development. Large-scale multi-tissue genomic resources have transformed the study of neuropsychiatric and neurodegenerative diseases, 
+                       but no equivalent resource exists for ALS. Here we present the full NYGC ALS Consortium dataset, combining whole-genome sequencing from 4,746 donors 
+                       and bulk RNA-seq from 2,574 samples across 8 brain and spinal cord regions from 695 donors across the ALS disease spectrum. Our catalogue of small variants, 
+                       structural variants, and short tandem repeats identified likely pathogenic mutations in 15.6% of ALS cases. Gene expression and mRNA splicing analysis 
+                       across 5 major tissues reveals shared and region-specific features, highlighting microglial and T-cell dysregulation in the spinal cord. Mapping the 
+                       genetic regulation of expression and splicing across tissues identified associations with 6 ALS risk loci, whereas allele-specific rare variant analysis 
+                       detected expression effects for C9orf72 and OPTN. All data are immediately publicly available."
                 ),
                 tags$br(),
                 tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
                        "Pre-print available at:"
                 ),
                 tags$a(
-                  href   = "https://doi.org/XXXXXXXXXXXX",   # <-- replace with real DOI
+                  href   = "https://doi.org/XXXXXXXXXXXX",   
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
@@ -583,7 +583,7 @@ ui <- fluidPage(
                        "Code available at:"
                 ),
                 tags$a(
-                  href   = "https://github.com/Eastmanmd/AlsGeneBroswer/",   # <-- replace with Github link 
+                  href   = "https://github.com/Eastmanmd/AlsGeneBroswer/",   
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
@@ -595,12 +595,26 @@ ui <- fluidPage(
                        "Full data available at:"
                 ),
                 tags$a(
-                  href   = "https://zenodo.org/XXXXXXX",   # <-- replace with link to zenodo
+                  href   = "https://zenodo.org/records/19835251", 
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
-                  "\U0001f517  https://zenodo.com/XXXXXXX"
+                  "\U0001f517  Metadata"
                 ),
+                tags$a(
+                  href   = "https://zenodo.org/records/18989237",   
+                  target = "_blank",
+                  style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
+                           font-weight:600; text-decoration:none;"),
+                  "\U0001f517  Gene Expression Data"
+                ),
+                tags$a(
+                  href   = "https://zenodo.org/records/19223231",   
+                  target = "_blank",
+                  style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
+                           font-weight:600; text-decoration:none;"),
+                  "\U0001f517  Splicing Data"
+                )
             )
         ),
         
@@ -691,7 +705,8 @@ server <- function(input, output, session) {
     session, "gene_input",
     choices  = all_genes,
     selected = if ("CHIT1" %in% all_genes) "CHIT1" else all_genes[1],
-    server   = TRUE          # loads options on demand rather than all at once
+    server   = TRUE
+    #options=list(plugins=list("remove_button","clear_button"))
   )
   
   updateSelectizeInput(
