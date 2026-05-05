@@ -592,11 +592,11 @@ ui <- fluidPage(
                        "Pre-print available at:"
                 ),
                 tags$a(
-                  href   = "https://doi.org/XXXXXXXXXXXX",   
+                  href   = "https://www.medrxiv.org/content/10.64898/2026.04.29.26350889v1",   
                   target = "_blank",
                   style  = paste0("color:", PAL_ACCENT, "; font-size:14px;
                            font-weight:600; text-decoration:none;"),
-                  "\U0001f517  https://doi.org/XXXXXXX"
+                  "\U0001f517  medRxiv"
                 ),
                 tags$br(),
                 tags$p(style = paste0("color:", PAL_MUTED, "; font-size:14px; line-height:1.75;"),
@@ -758,7 +758,8 @@ server <- function(input, output, session) {
   # }, ignoreNULL = FALSE)
   
   selected_gene <- reactive({
-    g <- trimws(toupper(input$gene_input))
+    #g <- trimws(toupper(input$gene_input))
+    g <- trimws(input$gene_input)
     req(g != "", g %in% all_genes)   
     g
   })
@@ -905,7 +906,8 @@ server <- function(input, output, session) {
   
   co_selected <- reactive({
     req(input$co_tissue)
-    g <- trimws(toupper(input$co_gene_input))
+    #g <- trimws(toupper(input$co_gene_input))
+    g <- trimws(input$co_gene_input)
     req(g != "", g %in% all_genes)
     list(gene = g, tissue = input$co_tissue)
   })
