@@ -354,6 +354,27 @@ app_css <- sprintf("
                    PAL_BORDER
 )
 
+responsive_css <- sprintf("
+  .about-container {
+    background: %s;
+    min-height: calc(100vh - 113px);
+    padding: 48px 64px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 768px) {
+    .main-layout { display: flex; flex-direction: column; height: auto; }
+    .tab-bar { padding: 0 16px; overflow-x: auto; white-space: nowrap; }
+    .sidebar { border-right: none; border-bottom: 1px solid %s; max-height: none; }
+    .plots-grid-3 { grid-template-columns: 1fr; max-height: none; }
+    .plot-panel-boxplot { max-height: none; }
+    .app-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .about-container { padding: 24px 16px !important; }
+  }
+", PAL_BG, PAL_BORDER)
+
+app_css <- paste0(app_css, responsive_css)
+
 # ── UI ───────────────────────────────────────────────────────
 ui <- fluidPage(
   title = "ALS Gene Expression Explorer",
@@ -519,8 +540,7 @@ ui <- fluidPage(
   # TAB 1 — About App Tab
   conditionalPanel(
     condition = "input.active_tab == 'about'",
-    div(style = paste0("background:", PAL_BG, "; min-height: calc(100vh - 113px);
-                      padding: 48px 64px; max-width: 1200px; margin: 0 auto;"),
+    div(class = "about-container",
         
         # ── App Overview ─────────────────────────────────────
         div(style = "margin-bottom: 40px;",
