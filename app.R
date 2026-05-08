@@ -383,7 +383,27 @@ ui <- fluidPage(
       href = "https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap",
       rel  = "stylesheet"
     ),
-    tags$style(HTML(app_css))
+    tags$style(HTML(app_css)),
+    tags$script(HTML("
+      $(document).on('shiny:connected', function(event) {
+        var isMobile = window.innerWidth <= 768;
+        Shiny.setInputValue('is_mobile', isMobile);
+        $(window).resize(function() {
+          Shiny.setInputValue('is_mobile', window.innerWidth <= 768);
+        });
+      });
+    "))
+  ),
+  
+  # ── Google Analytics  ────────────────────────────────────────────────
+  tags$head(
+    tags$script(async = NA, src = "https://www.googletagmanager.com/gtag/js?id=G-5CB8C7RLQ2"),
+    tags$script(HTML("
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5CB8C7RLQ2');
+    "))
   ),
   
   # ── Header ────────────────────────────────────────────────
@@ -803,18 +823,42 @@ server <- function(input, output, session) {
       dplyr::filter(gene == selected_gene(), !is.na(tissue), !is.na(condition))
     validate(need(nrow(gene_data) > 0,
                   paste0("'", selected_gene(), "' was not found in the expression data.")))
-    ggplot(gene_data,
+                  
+    if (isTRUE(input$is_mobile)) {
+      t_map <- c("Cerebellum" = "CBL", 
+                 "Lumbar Spinal Cord" = "LSC", 
+                 "Cervical Spinal Cord" = "CSC", 
+                 "Frontal Cortex" = "FCX", 
+                 "Motor Cortex" = "MCX")
+      if (is.factor(gene_data$tissue)) {
+        lvl <- levels(gene_data$tissue)
+        lvl <- ifelse(lvl %in% names(t_map), t_map[lvl], lvl)
+        levels(gene_data$tissue) <- lvl
+      } else {
+        gene_data$tissue <- ifelse(gene_data$tissue %in% names(t_map), 
+                                   t_map[gene_data$tissue], 
+                                   gene_data$tissue)
+      }
+    }
+
+    p <- ggplot(gene_data,
            aes(x = tissue, y = log2(tpm + 1), fill = condition, color = condition)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6,
                    width = 0.55, position = position_dodge(0.7), color = "black") +
-      geom_jitter(aes(group = condition),
-                  position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
-                  size = 1.5, alpha = 0.75) +
       scale_fill_manual(values  = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       scale_color_manual(values = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       labs(x = NULL, y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
       als_theme() +
       theme(axis.text.x = element_text(hjust = 0.5, size = 15))
+      
+    if (isTRUE(input$is_mobile)) {
+      p <- p + coord_flip()
+    } else {
+      p <- p + geom_jitter(aes(group = condition),
+                  position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
+                  size = 1.5, alpha = 0.75)
+    }
+    p
   }, bg = PAL_PANEL)
   
   output$deg_table_ui <- renderUI({
@@ -829,7 +873,7 @@ server <- function(input, output, session) {
   output$deg_table <- renderDT({
     req(selected_gene(), deg_all_data)
     g <- selected_gene()
-    tbl <- deg_all_data %>%
+    tbl_base <- deg_all_data %>%
       dplyr::filter(symbol == g) %>%
       dplyr::select(
         Tissue   = tissue,
@@ -837,51 +881,69 @@ server <- function(input, output, session) {
         `p-value`= dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
         `FDR`    = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
       ) %>%
-      dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3))) %>%
-      tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
-      tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
-      dplyr::rename(` ` = Metric)
-    validate(need(nrow(tbl) > 0, paste0("'", g, "' not found in DEG results.")))
+      dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3)))
+      
+    validate(need(nrow(tbl_base) > 0, paste0("'", g, "' not found in DEG results.")))
     
-    # datatable(tbl, rownames = FALSE,
-    #           options = list(dom = "t", ordering = FALSE,
-    #                          columnDefs = list(list(className = "dt-center",
-    #                                                 targets = seq_len(ncol(tbl) - 1)))),
-    #           class = "display compact") %>%
-    #   formatStyle(" ", target = "row",
-    #               backgroundColor = styleEqual("FDR", "rgba(26,122,74,0.06)"))
-    
-    ## ----------- Test new formating option to color LFC to match theme
-    
-    tissue_cols <- setdiff(colnames(tbl), " ")
-    
-    tbl_display <- tbl %>%
-      mutate(across(all_of(tissue_cols), ~ {
-        val   <- suppressWarnings(as.numeric(.x))
-        label <- tbl[[" "]][row_number()]
-        # dplyr::case_when(
-        #   label == "log2FC" & !is.na(val) & val < -1 ~
-        #     paste0('<span style="color:', PAL_CTRL, '">', sprintf("%.2f", val), '</span>'),
-        #   label == "log2FC" & !is.na(val) & val >  1 ~
-        #     paste0('<span style="color:', PAL_ALS,  '">', sprintf("%.2f", val), '</span>'),
-        #   label == "log2FC" & !is.na(val) ~
-        #     paste0('<span style="color:', PAL_MUTED, '">', sprintf("%.2f", val), '</span>'),
-        #   (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~
-        #     paste0('<span style="font-weight:600">', sprintf("%.2f", val), '</span>'),
-        #   TRUE ~ .x
-        # )
-        dplyr::case_when(
-          label == "log2FC" & !is.na(val) & val < -1 ~
-            paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
-          label == "log2FC" & !is.na(val) & val >  1 ~
-            paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
-          label == "log2FC" & !is.na(val) ~
-            paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
-          (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~
-            paste0('<span style="font-weight:600">', val, '</span>'),
-          TRUE ~ as.character(val)
-        )
-      }))
+    if (isTRUE(input$is_mobile)) {
+      t_map <- c("Cerebellum" = "CBL", 
+                 "Lumbar Spinal Cord" = "LSC", 
+                 "Cervical Spinal Cord" = "CSC", 
+                 "Frontal Cortex" = "FCX", 
+                 "Motor Cortex" = "MCX")
+      
+      tbl_display <- tbl_base %>%
+        dplyr::mutate(Tissue = ifelse(as.character(Tissue) %in% names(t_map), 
+                                      t_map[as.character(Tissue)], 
+                                      as.character(Tissue))) %>%
+        dplyr::mutate(
+          log2FC = {
+            val <- suppressWarnings(as.numeric(log2FC))
+            dplyr::case_when(
+              !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
+              !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
+              !is.na(val)            ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
+              TRUE ~ as.character(val)
+            )
+          },
+          `p-value` = {
+            val <- suppressWarnings(as.numeric(`p-value`))
+            dplyr::case_when(
+              !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+              TRUE ~ as.character(val)
+            )
+          },
+          FDR = {
+            val <- suppressWarnings(as.numeric(FDR))
+            dplyr::case_when(
+              !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+              TRUE ~ as.character(val)
+            )
+          }
+        ) %>%
+        dplyr::rename(` ` = Tissue)
+        
+    } else {
+      tbl <- tbl_base %>%
+        tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
+        tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
+        dplyr::rename(` ` = Metric)
+        
+      tissue_cols <- setdiff(colnames(tbl), " ")
+      
+      tbl_display <- tbl %>%
+        mutate(across(all_of(tissue_cols), ~ {
+          val   <- suppressWarnings(as.numeric(.x))
+          label <- tbl[[" "]][row_number()]
+          dplyr::case_when(
+            label == "log2FC" & !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
+            label == "log2FC" & !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
+            label == "log2FC" & !is.na(val) ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
+            (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+            TRUE ~ as.character(val)
+          )
+        }))
+    }
     
     datatable(tbl_display, rownames = FALSE, escape = FALSE, width = "100%",
               options = list(dom = "t", 
@@ -890,9 +952,6 @@ server <- function(input, output, session) {
                              columnDefs = list(list(className = "dt-center",
                                                     targets = seq_len(ncol(tbl_display) - 1)))),
               class = "display compact")
-    
-  ## ---------------------------------------------------------------------------
-    
   })
   
   # ════════════════════════════════════════════════════════
