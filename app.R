@@ -373,7 +373,32 @@ responsive_css <- sprintf("
   }
 ", PAL_BG, PAL_BORDER)
 
-app_css <- paste0(app_css, responsive_css)
+app_css <- paste0(app_css, responsive_css, "
+  .btn-download {
+    background: transparent !important;
+    border: 1px solid #D5D8DC !important;
+    border-radius: 6px !important;
+    color: #717D7E !important;
+    font-family: 'Open Sans', monospace !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    padding: 6px 12px !important;
+    cursor: pointer !important;
+    transition: background-color .15s, border-color .15s, color .15s !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+    margin-top: 8px;
+  }
+  .btn-download:hover {
+    background-color: #2980B9 !important;
+    border-color: #2980B9 !important;
+    color: #FFFFFF !important;
+  }
+")
 
 # ── UI ───────────────────────────────────────────────────────
 ui <- fluidPage(
@@ -692,7 +717,7 @@ ui <- fluidPage(
                       )
                   )
                 ))
-            ),
+        ),
         
         # ── Footer ───────────────────────────────────────────
         tags$hr(style = paste0("border:none; border-top:1px solid ", PAL_BORDER, ";
@@ -808,22 +833,13 @@ server <- function(input, output, session) {
     paste0(g, " Expression Across Tissues")
   })
   
-  output$boxplot_ui <- renderUI({
-    g <- selected_gene()
-    if (is.null(g) || g == "" || is.null(tpm_long_data))
-      return(div(class = "empty-state",
-                 div(class = "es-icon", "\U0001f9ec"),
-                 tags$p("Select a gene and press Explore")))
-    plotOutput("boxplot", height = "350px")
-  })
-  
-  output$boxplot <- renderPlot({
+  boxplot_plot <- reactive({
     req(selected_gene(), tpm_long_data)
     gene_data <- tpm_long_data %>%
       dplyr::filter(gene == selected_gene(), !is.na(tissue), !is.na(condition))
     validate(need(nrow(gene_data) > 0,
                   paste0("'", selected_gene(), "' was not found in the expression data.")))
-                  
+    
     if (isTRUE(input$is_mobile)) {
       t_map <- c("Cerebellum" = "CBL", 
                  "Lumbar Spinal Cord" = "LSC", 
@@ -840,26 +856,53 @@ server <- function(input, output, session) {
                                    gene_data$tissue)
       }
     }
-
+    
     p <- ggplot(gene_data,
-           aes(x = tissue, y = log2(tpm + 1), fill = condition, color = condition)) +
+                aes(x = tissue, y = log2(tpm + 1), fill = condition, color = condition)) +
       geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6,
                    width = 0.55, position = position_dodge(0.7), color = "black") +
       scale_fill_manual(values  = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       scale_color_manual(values = c("ALS" = PAL_ALS,  "Control" = PAL_CTRL)) +
       labs(x = NULL, y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
       als_theme() +
-      theme(axis.text.x = element_text(hjust = 0.5, size = 15))
-      
+      theme(axis.text.x = element_text(hjust = 0.5, size = 12))
+    
     if (isTRUE(input$is_mobile)) {
       p <- p + coord_flip()
     } else {
       p <- p + geom_jitter(aes(group = condition),
-                  position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
-                  size = 1.5, alpha = 0.75)
+                           position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.7),
+                           size = 1.0, alpha = 0.75)
     }
     p
+  })
+  
+  output$boxplot_ui <- renderUI({
+    g <- selected_gene()
+    if (is.null(g) || g == "" || is.null(tpm_long_data))
+      return(div(class = "empty-state",
+                 div(class = "es-icon", "\U0001f9ec"),
+                 tags$p("Select a gene and press Explore")))
+    tagList(
+      plotOutput("boxplot", height = "350px"),
+      div(style = "text-align: right;",
+          downloadButton("download_boxplot", "Download Plot", class = "btn-download")
+      )
+    )
+  })
+  
+  output$boxplot <- renderPlot({
+    boxplot_plot()
   }, bg = PAL_PANEL)
+  
+  output$download_boxplot <- downloadHandler(
+    filename = function() {
+      paste0(selected_gene(), "_als_vs_control_boxplot.png")
+    },
+    content = function(file) {
+      ggsave(file, plot = boxplot_plot(), width = 12, height = 6, dpi = 300, device = "png")
+    }
+  )
   
   output$deg_table_ui <- renderUI({
     g <- selected_gene()
@@ -882,7 +925,7 @@ server <- function(input, output, session) {
         `FDR`    = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
       ) %>%
       dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3)))
-      
+    
     validate(need(nrow(tbl_base) > 0, paste0("'", g, "' not found in DEG results.")))
     
     if (isTRUE(input$is_mobile)) {
@@ -922,13 +965,13 @@ server <- function(input, output, session) {
           }
         ) %>%
         dplyr::rename(` ` = Tissue)
-        
+      
     } else {
       tbl <- tbl_base %>%
         tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
         tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
         dplyr::rename(` ` = Metric)
-        
+      
       tissue_cols <- setdiff(colnames(tbl), " ")
       
       tbl_display <- tbl %>%
@@ -996,16 +1039,7 @@ server <- function(input, output, session) {
   })
   
   # ── C9orf72 boxplot ──────────────────────────────────────
-  output$co_c9_boxplot_ui <- renderUI({
-    sel <- co_selected()
-    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
-      return(div(class = "empty-state",
-                 div(class = "es-icon", "\U0001f9ec"),
-                 tags$p("Select a gene and tissue to begin")))
-    plotOutput("co_c9_boxplot", height = "350px")
-  })
-  
-  output$co_c9_boxplot <- renderPlot({
+  co_c9_plot <- reactive({
     d <- co_gene_tissue_data()
     validate(
       need(nrow(d) > 0,                    "No data for this gene/tissue combination."),
@@ -1020,19 +1054,38 @@ server <- function(input, output, session) {
       scale_color_manual(values = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
       labs(x = "C9orf72 Status", y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
       als_theme()
-  }, bg = PAL_PANEL)
+  })
   
-  # ── Age at death scatter ─────────────────────────────────
-  output$co_age_scatter_ui <- renderUI({
+  output$co_c9_boxplot_ui <- renderUI({
     sel <- co_selected()
     if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
-                 div(class = "es-icon", "\U0001f4c5"),
-                 tags$p("Select a gene and tissue")))
-    plotOutput("co_age_scatter", height = "350px")
+                 div(class = "es-icon", "\U0001f9ec"),
+                 tags$p("Select a gene and tissue to begin")))
+    tagList(
+      plotOutput("co_c9_boxplot", height = "350px"),
+      div(style = "text-align: right;",
+          downloadButton("download_co_c9", "Download Plot", class = "btn-download")
+      )
+    )
   })
   
-  output$co_age_scatter <- renderPlot({
+  output$co_c9_boxplot <- renderPlot({
+    co_c9_plot()
+  }, bg = PAL_PANEL)
+  
+  output$download_co_c9 <- downloadHandler(
+    filename = function() {
+      sel <- co_selected()
+      paste0(sel$gene, "_", gsub(" ", "_", sel$tissue), "_c9orf72_boxplot.png")
+    },
+    content = function(file) {
+      ggsave(file, plot = co_c9_plot(), width = 8, height = 6, dpi = 300, device = "png")
+    }
+  )
+  
+  # ── Age at death scatter ─────────────────────────────────
+  co_age_plot <- reactive({
     d <- co_gene_tissue_data()
     validate(
       need(nrow(d) > 0,                        "No data for this gene/tissue combination."),
@@ -1045,19 +1098,38 @@ server <- function(input, output, session) {
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Age at Death (years)", y = "log\u2082(TPM + 1)") +
       als_theme()
-  }, bg = PAL_PANEL)
+  })
   
-  # ── Disease duration scatter ─────────────────────────────
-  output$co_dur_scatter_ui <- renderUI({
+  output$co_age_scatter_ui <- renderUI({
     sel <- co_selected()
     if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4c5"),
                  tags$p("Select a gene and tissue")))
-    plotOutput("co_dur_scatter", height = "350px")
+    tagList(
+      plotOutput("co_age_scatter", height = "350px"),
+      div(style = "text-align: right;",
+          downloadButton("download_co_age", "Download Plot", class = "btn-download")
+      )
+    )
   })
   
-  output$co_dur_scatter <- renderPlot({
+  output$co_age_scatter <- renderPlot({
+    co_age_plot()
+  }, bg = PAL_PANEL)
+  
+  output$download_co_age <- downloadHandler(
+    filename = function() {
+      sel <- co_selected()
+      paste0(sel$gene, "_", gsub(" ", "_", sel$tissue), "_age_at_death_scatter.png")
+    },
+    content = function(file) {
+      ggsave(file, plot = co_age_plot(), width = 8, height = 6, dpi = 300, device = "png")
+    }
+  )
+  
+  # ── Disease duration scatter ─────────────────────────────
+  co_dur_plot <- reactive({
     d <- co_gene_tissue_data()
     validate(
       need(nrow(d) > 0,                          "No data for this gene/tissue combination."),
@@ -1070,7 +1142,35 @@ server <- function(input, output, session) {
                   alpha = 0.15, linewidth = 0.9) +
       labs(x = "Disease Duration (months)", y = "log\u2082(TPM + 1)") +
       als_theme()
+  })
+  
+  output$co_dur_scatter_ui <- renderUI({
+    sel <- co_selected()
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
+      return(div(class = "empty-state",
+                 div(class = "es-icon", "\U0001f4c5"),
+                 tags$p("Select a gene and tissue")))
+    tagList(
+      plotOutput("co_dur_scatter", height = "350px"),
+      div(style = "text-align: right;",
+          downloadButton("download_co_dur", "Download Plot", class = "btn-download")
+      )
+    )
+  })
+  
+  output$co_dur_scatter <- renderPlot({
+    co_dur_plot()
   }, bg = PAL_PANEL)
+  
+  output$download_co_dur <- downloadHandler(
+    filename = function() {
+      sel <- co_selected()
+      paste0(sel$gene, "_", gsub(" ", "_", sel$tissue), "_disease_duration_scatter.png")
+    },
+    content = function(file) {
+      ggsave(file, plot = co_dur_plot(), width = 8, height = 6, dpi = 300, device = "png")
+    }
+  )
   
   # ── ALS-only DEG table ──────────────────────────────────
   output$co_deg_table_ui <- renderUI({
@@ -1126,3 +1226,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+
