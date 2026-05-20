@@ -398,6 +398,23 @@ app_css <- paste0(app_css, responsive_css, "
     border-color: #2980B9 !important;
     color: #FFFFFF !important;
   }
+  .checkbox {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  .checkbox label {
+    font-family: 'Open Sans', monospace !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: #717D7E !important;
+    cursor: pointer !important;
+  }
+  .checkbox input[type='checkbox'] {
+    margin-right: 8px !important;
+    cursor: pointer !important;
+  }
 ")
 
 # ── UI ───────────────────────────────────────────────────────
@@ -478,7 +495,7 @@ ui <- fluidPage(
                   width = "100%"
                 ),
                 div(class = "gene-hint",
-                    "Type to search gene symbols (e.g. SOD1, TARDBP, FUS)"),
+                    "Enter gene symbol (e.g. SOD1 )"),
                 actionButton("go", "\u25b6  EXPLORE GENE",
                              class = "btn-search")
             ),
@@ -537,12 +554,13 @@ ui <- fluidPage(
                   width = "100%"
                 ),
                 div(class = "gene-hint",
-                    "Type to search gene symbols (e.g. SOD1, TARDBP, FUS)")
+                    "Enter gene symbol (e.g. SOD1 )")
             ),
             div(class = "sidebar-section",
-                tags$span(class = "sidebar-label", "Tissue"),
-                div(class = "tissue-select",
-                    uiOutput("co_tissue_select_ui"))
+                checkboxInput("co_all_tissues", "All Tissues", value = FALSE)
+            ),
+            div(class = "sidebar-section",
+                uiOutput("co_variable_or_tissue_ui")
             ),
             actionButton("co_go", "\u25b6  EXPLORE GENE",
                          class = "btn-search"),
@@ -560,20 +578,7 @@ ui <- fluidPage(
             )
         ),
         div(class = "main-content",
-            div(class = "plots-grid-3",
-                div(class = "plot-panel",
-                    div(class = "panel-title", uiOutput("co_boxplot_title")),
-                    uiOutput("co_c9_boxplot_ui")
-                ),
-                div(class = "plot-panel",
-                    div(class = "panel-title", uiOutput("co_age_title")),
-                    uiOutput("co_age_scatter_ui")
-                ),
-                div(class = "plot-panel",
-                    div(class = "panel-title", uiOutput("co_dur_title")),
-                    uiOutput("co_dur_scatter_ui")
-                )
-            ),
+            uiOutput("co_plots_ui"),
             div(class = "plot-panel",
                 div(class = "panel-title", "Differential Expression Results Across Select Clinical Variables"),
                 uiOutput("co_deg_table_ui")
@@ -758,12 +763,24 @@ server <- function(input, output, session) {
     updateTextInput(session, "active_tab", value = "co")
   })
   
-  # ── Tissue dropdown (case-only) — default to Cerebellum ──
-  output$co_tissue_select_ui <- renderUI({
-    tissues <- if (!is.null(tpm_als_only)) sort(unique(tpm_als_only$tissue)) else character(0)
-    default_tissue <- if ("Cerebellum" %in% tissues) "Cerebellum" else tissues[1]
-    selectInput("co_tissue", label = NULL, choices = tissues,
-                selected = default_tissue, width = "100%")
+  # ── Tissue dropdown or clinical variable select (case-only) ──
+  output$co_variable_or_tissue_ui <- renderUI({
+    if (isTRUE(input$co_all_tissues)) {
+      selectInput("co_variable", label = tags$span(class = "sidebar-label", "Clinical Variable"),
+                  choices = c("C9orf72 Status" = "c9orf72", 
+                              "Age at Death" = "age_at_death", 
+                              "Disease Duration" = "disease_duration"),
+                  selected = "c9orf72", width = "100%")
+    } else {
+      tissues <- if (!is.null(tpm_als_only)) sort(unique(tpm_als_only$tissue)) else character(0)
+      default_tissue <- if ("Cerebellum" %in% tissues) "Cerebellum" else tissues[1]
+      tagList(
+        tags$span(class = "sidebar-label", "Tissue"),
+        div(class = "tissue-select",
+            selectInput("co_tissue", label = NULL, choices = tissues,
+                        selected = default_tissue, width = "100%"))
+      )
+    }
   })
   
   updateSelectizeInput(
@@ -1007,18 +1024,28 @@ server <- function(input, output, session) {
   # }, ignoreNULL = TRUE, ignoreInit = TRUE)
   
   co_selected <- reactive({
-    req(input$co_tissue)
-    #g <- trimws(toupper(input$co_gene_input))
-    g <- trimws(input$co_gene_input)
-    req(g != "", g %in% all_genes)
-    list(gene = g, tissue = input$co_tissue)
+    if (isTRUE(input$co_all_tissues)) {
+      g <- trimws(input$co_gene_input)
+      req(g != "", g %in% all_genes)
+      req(input$co_variable)
+      list(gene = g, all_tissues = TRUE, variable = input$co_variable)
+    } else {
+      req(input$co_tissue)
+      g <- trimws(input$co_gene_input)
+      req(g != "", g %in% all_genes)
+      list(gene = g, all_tissues = FALSE, tissue = input$co_tissue)
+    }
   })
   
   # ALS data filtered to selected gene + tissue
   co_gene_tissue_data <- reactive({
     sel <- co_selected()
     req(sel$gene != "")
-    dplyr::filter(tpm_als_only, gene == sel$gene, tissue == sel$tissue)
+    if (isTRUE(sel$all_tissues)) {
+      dplyr::filter(tpm_als_only, gene == sel$gene)
+    } else {
+      dplyr::filter(tpm_als_only, gene == sel$gene, tissue == sel$tissue)
+    }
   })
   
   # ── panel titles ─────────────────────────────────────────
@@ -1172,13 +1199,214 @@ server <- function(input, output, session) {
     }
   )
   
+  # ── All Tissues Plot Reactives & Outputs ───────────────────────
+  co_all_tissues_c9_plot <- reactive({
+    d <- co_gene_tissue_data()
+    validate(
+      need(nrow(d) > 0, "No data for this gene."),
+      need("c9orf72" %in% colnames(d), "C9orf72 status not available in metadata.")
+    )
+    d <- dplyr::filter(d, !is.na(c9orf72), !is.na(tissue))
+    d$c9orf72 <- factor(d$c9orf72)
+    
+    if (isTRUE(input$is_mobile)) {
+      t_map <- c("Cerebellum" = "CBL", 
+                 "Lumbar Spinal Cord" = "LSC", 
+                 "Cervical Spinal Cord" = "CSC", 
+                 "Frontal Cortex" = "FCX", 
+                 "Motor Cortex" = "MCX")
+      if (is.factor(d$tissue)) {
+        lvl <- levels(d$tissue)
+        lvl <- ifelse(lvl %in% names(t_map), t_map[lvl], lvl)
+        levels(d$tissue) <- lvl
+      } else {
+        d$tissue <- ifelse(d$tissue %in% names(t_map), 
+                           t_map[d$tissue], 
+                           d$tissue)
+      }
+    }
+    
+    p <- ggplot(d, aes(x = tissue, y = log2(tpm + 1), fill = c9orf72, color = c9orf72)) +
+      geom_boxplot(alpha = 0.25, outlier.shape = NA, linewidth = 0.6,
+                   width = 0.55, position = position_dodge(0.7), color = "black") +
+      scale_fill_manual(values  = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
+      scale_color_manual(values = c("C9 +" = PAL_C9_YES, "C9 -" = PAL_C9_NO)) +
+      labs(x = NULL, y = "log\u2082(TPM + 1)", fill = NULL, color = NULL) +
+      als_theme() +
+      theme(axis.text.x = element_text(hjust = 0.5, size = 12))
+    
+    if (isTRUE(input$is_mobile)) {
+      p <- p + coord_flip()
+    } else {
+      p <- p + geom_jitter(aes(group = c9orf72),
+                           position = position_jitterdodge(jitter.width = 0.25, dodge.width = 0.7),
+                           size = 1.0, alpha = 0.75)
+    }
+    p
+  })
+  
+  co_all_tissues_age_plot <- reactive({
+    d <- co_gene_tissue_data()
+    validate(
+      need(nrow(d) > 0, "No data for this gene."),
+      need("age_at_death" %in% colnames(d), "Age at death not available in metadata.")
+    )
+    d <- dplyr::filter(d, !is.na(age_at_death), !is.na(tissue))
+    
+    if (isTRUE(input$is_mobile)) {
+      t_map <- c("Cerebellum" = "CBL", 
+                 "Lumbar Spinal Cord" = "LSC", 
+                 "Cervical Spinal Cord" = "CSC", 
+                 "Frontal Cortex" = "FCX", 
+                 "Motor Cortex" = "MCX")
+      if (is.factor(d$tissue)) {
+        lvl <- levels(d$tissue)
+        lvl <- ifelse(lvl %in% names(t_map), t_map[lvl], lvl)
+        levels(d$tissue) <- lvl
+      } else {
+        d$tissue <- ifelse(d$tissue %in% names(t_map), 
+                           t_map[d$tissue], 
+                           d$tissue)
+      }
+    }
+    
+    p <- ggplot(d, aes(x = age_at_death, y = log2(tpm + 1))) +
+      geom_point(color = "#C0392B", alpha = 0.7, size = 1.2) +
+      geom_smooth(method = "lm", color = PAL_ACCENT, fill = PAL_ACCENT,
+                  alpha = 0.15, linewidth = 0.9) +
+      labs(x = "Age at Death (years)", y = "log\u2082(TPM + 1)") +
+      als_theme()
+    
+    if (isTRUE(input$is_mobile)) {
+      p <- p + facet_wrap(~ tissue, ncol = 1)
+    } else {
+      p <- p + facet_wrap(~ tissue, nrow = 1) + theme(strip.text = element_text(size = 12, face = "bold"))
+    }
+    p
+  })
+  
+  co_all_tissues_dur_plot <- reactive({
+    d <- co_gene_tissue_data()
+    validate(
+      need(nrow(d) > 0, "No data for this gene."),
+      need("disease_duration" %in% colnames(d), "Disease duration not available in metadata.")
+    )
+    d <- dplyr::filter(d, !is.na(disease_duration), !is.na(tissue))
+    
+    if (isTRUE(input$is_mobile)) {
+      t_map <- c("Cerebellum" = "CBL", 
+                 "Lumbar Spinal Cord" = "LSC", 
+                 "Cervical Spinal Cord" = "CSC", 
+                 "Frontal Cortex" = "FCX", 
+                 "Motor Cortex" = "MCX")
+      if (is.factor(d$tissue)) {
+        lvl <- levels(d$tissue)
+        lvl <- ifelse(lvl %in% names(t_map), t_map[lvl], lvl)
+        levels(d$tissue) <- lvl
+      } else {
+        d$tissue <- ifelse(d$tissue %in% names(t_map), 
+                           t_map[d$tissue], 
+                           d$tissue)
+      }
+    }
+    
+    p <- ggplot(d, aes(x = disease_duration, y = log2(tpm + 1))) +
+      geom_point(color = "#C0392B", alpha = 0.7, size = 1.2) +
+      geom_smooth(method = "lm", color = PAL_MUTED, fill = PAL_MUTED,
+                  alpha = 0.15, linewidth = 0.9) +
+      labs(x = "Disease Duration (months)", y = "log\u2082(TPM + 1)") +
+      als_theme()
+    
+    if (isTRUE(input$is_mobile)) {
+      p <- p + facet_wrap(~ tissue, ncol = 1)
+    } else {
+      p <- p + facet_wrap(~ tissue, nrow = 1) + theme(strip.text = element_text(size = 12, face = "bold"))
+    }
+    p
+  })
+  
+  co_all_tissues_plot_obj <- reactive({
+    sel <- co_selected()
+    req(sel$variable)
+    if (sel$variable == "c9orf72") {
+      co_all_tissues_c9_plot()
+    } else if (sel$variable == "age_at_death") {
+      co_all_tissues_age_plot()
+    } else {
+      co_all_tissues_dur_plot()
+    }
+  })
+  
+  output$co_all_tissues_plot_title <- renderUI({
+    sel <- co_selected()
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "") return("Select a gene")
+    var_label <- switch(sel$variable,
+                        "c9orf72" = "C9orf72 Status",
+                        "age_at_death" = "Age at Death",
+                        "disease_duration" = "Disease Duration")
+    paste0(sel$gene, "  \u2014  ", var_label, " Across All Tissues")
+  })
+  
+  output$co_all_tissues_plot_ui <- renderUI({
+    sel <- co_selected()
+    if (is.null(sel) || is.null(sel$gene) || sel$gene == "")
+      return(div(class = "empty-state",
+                 div(class = "es-icon", "\U0001f9ec"),
+                 tags$p("Select a gene")))
+    tagList(
+      plotOutput("co_all_tissues_plot", height = "380px"),
+      div(style = "text-align: right;",
+          downloadButton("download_co_all_tissues", "Download Plot", class = "btn-download")
+      )
+    )
+  })
+  
+  output$co_all_tissues_plot <- renderPlot({
+    co_all_tissues_plot_obj()
+  }, bg = PAL_PANEL)
+  
+  output$download_co_all_tissues <- downloadHandler(
+    filename = function() {
+      sel <- co_selected()
+      paste0(sel$gene, "_all_tissues_", sel$variable, ".png")
+    },
+    content = function(file) {
+      ggsave(file, plot = co_all_tissues_plot_obj(), width = 12, height = 6, dpi = 300, device = "png")
+    }
+  )
+  
+  # ── Plots switcher UI ──────────────────────────────────────────
+  output$co_plots_ui <- renderUI({
+    if (isTRUE(input$co_all_tissues)) {
+      div(class = "plot-panel plot-panel-boxplot",
+          div(class = "panel-title", uiOutput("co_all_tissues_plot_title")),
+          uiOutput("co_all_tissues_plot_ui")
+      )
+    } else {
+      div(class = "plots-grid-3",
+          div(class = "plot-panel",
+              div(class = "panel-title", uiOutput("co_boxplot_title")),
+              uiOutput("co_c9_boxplot_ui")
+          ),
+          div(class = "plot-panel",
+              div(class = "panel-title", uiOutput("co_age_title")),
+              uiOutput("co_age_scatter_ui")
+          ),
+          div(class = "plot-panel",
+              div(class = "panel-title", uiOutput("co_dur_title")),
+              uiOutput("co_dur_scatter_ui")
+          )
+      )
+    }
+  })
+  
   # ── ALS-only DEG table ──────────────────────────────────
   output$co_deg_table_ui <- renderUI({
-    sel <- co_selected()
-    if (is.null(sel$gene) || sel$gene == "" || length(case_only_data) == 0)
+    g <- trimws(input$co_gene_input)
+    if (g == "" || length(case_only_data) == 0)
       return(div(class = "empty-state",
                  div(class = "es-icon", "\U0001f4cb"),
-                 tags$p("Select a gene and tissue to see DEG results")))
+                 tags$p("Select a gene to see DEG results")))
     DTOutput("co_deg_table")
   })
   
@@ -1186,42 +1414,136 @@ server <- function(input, output, session) {
     sel <- co_selected()
     req(sel$gene != "", length(case_only_data) > 0)
     g <- sel$gene
-    t <- sel$tissue
     
-    pull_tbl <- function(nm, label) {
-      df <- case_only_data[[nm]]
-      if (is.null(df)) return(NULL)
+    if (isTRUE(sel$all_tissues)) {
+      # ── CASE 1: All Tissues ──
+      df <- case_only_data[[sel$variable]]
+      validate(need(!is.null(df), "No data for this variable."))
       df <- data.frame(df)
-      df %>%
-        dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
+      
+      tbl_base <- df %>%
+        dplyr::filter(.data$symbol == .env$g) %>%
         dplyr::select(
+          Tissue    = tissue,
           `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
           `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
           `FDR`     = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
         ) %>%
-        dplyr::mutate(Analysis = label, .before = 1) %>%
-        dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4)))
+        dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3)))
+      
+      validate(need(nrow(tbl_base) > 0, paste0("'", g, "' not found in DEG results for ", sel$variable, ".")))
+      
+      if (isTRUE(input$is_mobile)) {
+        t_map <- c("Cerebellum" = "CBL", 
+                   "Lumbar Spinal Cord" = "LSC", 
+                   "Cervical Spinal Cord" = "CSC", 
+                   "Frontal Cortex" = "FCX", 
+                   "Motor Cortex" = "MCX")
+        
+        tbl_display <- tbl_base %>%
+          dplyr::mutate(Tissue = ifelse(as.character(Tissue) %in% names(t_map), 
+                                        t_map[as.character(Tissue)], 
+                                        as.character(Tissue))) %>%
+          dplyr::mutate(
+            log2FC = {
+              val <- suppressWarnings(as.numeric(log2FC))
+              dplyr::case_when(
+                !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
+                !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
+                !is.na(val)            ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
+                TRUE ~ as.character(val)
+              )
+            },
+            `p-value` = {
+              val <- suppressWarnings(as.numeric(`p-value`))
+              dplyr::case_when(
+                !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+                TRUE ~ as.character(val)
+              )
+            },
+            FDR = {
+              val <- suppressWarnings(as.numeric(FDR))
+              dplyr::case_when(
+                !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+                TRUE ~ as.character(val)
+              )
+            }
+          ) %>%
+          dplyr::rename(` ` = Tissue)
+        
+        col_targets <- seq_len(ncol(tbl_display) - 1)
+        
+      } else {
+        tbl <- tbl_base %>%
+          tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
+          tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
+          dplyr::rename(` ` = Metric)
+        
+        tissue_cols <- setdiff(colnames(tbl), " ")
+        
+        tbl_display <- tbl %>%
+          dplyr::mutate(dplyr::across(dplyr::all_of(tissue_cols), ~ {
+            val   <- suppressWarnings(as.numeric(.x))
+            label <- tbl[[" "]][row_number()]
+            dplyr::case_when(
+              label == "log2FC" & !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
+              label == "log2FC" & !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
+              label == "log2FC" & !is.na(val) ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
+              (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
+              TRUE ~ as.character(val)
+            )
+          }))
+        
+        col_targets <- seq_len(ncol(tbl_display) - 1)
+      }
+      
+      datatable(tbl_display, rownames = FALSE, escape = FALSE, width = "100%",
+                options = list(dom = "t", 
+                               ordering = FALSE,
+                               scrollX   = FALSE,
+                               columnDefs = list(list(className = "dt-center", targets = col_targets))),
+                class = "display compact")
+      
+    } else {
+      # ── CASE 2: Single Tissue ──
+      t <- sel$tissue
+      
+      pull_tbl <- function(nm, label) {
+        df <- case_only_data[[nm]]
+        if (is.null(df)) return(NULL)
+        df <- data.frame(df)
+        
+        df %>%
+          dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
+          dplyr::select(
+            `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
+            `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
+            `FDR`     = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
+          ) %>%
+          dplyr::mutate(Analysis = label, .before = 1) %>%
+          dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4)))
+      }
+      
+      tbl <- dplyr::bind_rows(
+        pull_tbl("c9orf72",          "C9orf72 Status"),
+        pull_tbl("age_at_death",     "Age at Death"),
+        pull_tbl("disease_duration", "Disease Duration")
+      )
+      
+      validate(need(nrow(tbl) > 0,
+                    paste0("'", g, "' not found in ALS-only DEG results for ", t, ".")))
+      
+      datatable(tbl, rownames = FALSE, width = "100%",
+                options = list(dom = "t", ordering = FALSE,
+                               scrollX   = FALSE,
+                               columnDefs = list(list(className = "dt-center", targets = 1:3))),
+                class = "display compact") %>%
+        formatStyle("FDR",
+                    color      = styleInterval(c(0.05), c("#1A7A4A", PAL_MUTED)),
+                    fontWeight = styleInterval(c(0.05), c("600", "normal"))) %>%
+        formatStyle("log2FC",
+                    color = styleInterval(c(-1, 1), c(PAL_CTRL, PAL_MUTED, PAL_ALS)))
     }
-    
-    tbl <- dplyr::bind_rows(
-      pull_tbl("c9orf72",          "C9orf72 Status"),
-      pull_tbl("age_at_death",     "Age at Death"),
-      pull_tbl("disease_duration", "Disease Duration")
-    )
-    
-    validate(need(nrow(tbl) > 0,
-                  paste0("'", g, "' not found in ALS-only DEG results for ", t, ".")))
-    
-    datatable(tbl, rownames = FALSE, width = "100%",
-              options = list(dom = "t", ordering = FALSE,
-                             scrollX   = FALSE,
-                             columnDefs = list(list(className = "dt-center", targets = 1:3))),
-              class = "display compact") %>%
-      formatStyle("FDR",
-                  color      = styleInterval(c(0.05), c("#1A7A4A", PAL_MUTED)),
-                  fontWeight = styleInterval(c(0.05), c("600", "normal"))) %>%
-      formatStyle("log2FC",
-                  color = styleInterval(c(-1, 1), c(PAL_CTRL, PAL_MUTED, PAL_ALS)))
   })
 }
 
