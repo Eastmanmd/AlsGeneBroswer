@@ -109,14 +109,14 @@ als_theme <- function() {
 ANALYSES <- list(
   c9orf72 = list(label = "C9orf72 status", column = "c9orf72", type = "categorical",
                  groups = c("C9 -", "C9 +"), colors = c("C9 -" = PAL_C9_NO, "C9 +" = PAL_C9_YES),
-                 effect = "log2FC", direction = "C9+ vs C9-; confirm against the fitted model"),
+                 effect = "log2FC", effect_cutoff = 1, direction = "C9+ vs C9-; confirm against the fitted model"),
   sod1 = list(label = "SOD1 status", column = "sod1", type = "categorical",
               groups = c("SOD1 -", "SOD1 +"), colors = c("SOD1 -" = "#D68910", "SOD1 +" = "#117864"),
-              effect = "log2FC", direction = "SOD1+ vs SOD1-; confirm against the fitted model"),
+              effect = "log2FC", effect_cutoff = 1, direction = "SOD1+ vs SOD1-; confirm against the fitted model"),
   age_at_death = list(label = "Age at death", column = "age_at_death", type = "continuous",
-                      axis = "Age at death (years)", effect = "Coefficient", direction = "Effect unit: verify the scaling used in the fitted model"),
+                      axis = "Age at death (years)", effect = "log2FC", effect_cutoff = 0.0025, direction = "Log2 fold change for age at death"),
   disease_duration = list(label = "Disease duration", column = "disease_duration", type = "continuous",
-                          axis = "Disease duration (months)", effect = "Coefficient", direction = "Effect unit: verify the scaling used in the fitted model")
+                          axis = "Disease duration (months)", effect = "log2FC", effect_cutoff = 0.0025, direction = "Log2 fold change for disease duration")
 )
 MODEL_LABELS <- c(existing = "Standard model", music = "MuSiC proportion adjusted")
 TISSUE_LABELS <- c("Cerebellum" = "CBL", "Lumbar Spinal Cord" = "LSC",
@@ -131,7 +131,16 @@ load_optional_rds <- function(path) {
   })
 }
 
-expression_plot <- function(d, analysis = NULL, all_tissues = TRUE) {
+# Choose readable facet dimensions from the available plot width.
+scatter_layout <- function(width = 1200, tissues = 5L) {
+  if (length(width) != 1 || !is.finite(width) || width <= 0) width <- 1200
+  columns <- if (width < 650) 1L else if (width < 1100) 2L else 3L
+  columns <- min(columns, max(1L, tissues))
+  rows <- ceiling(max(1L, tissues) / columns)
+  list(columns = columns, height = as.integer(80 + 260 * rows))
+}
+
+expression_plot <- function(d, analysis = NULL, all_tissues = TRUE, shared_y = FALSE, facet_columns = 3L) {
   if (is.null(analysis)) {
     column <- 'condition'; groups <- c('Control', 'ALS')
     colors <- c(Control = PAL_CTRL, ALS = PAL_ALS)
@@ -142,7 +151,7 @@ expression_plot <- function(d, analysis = NULL, all_tissues = TRUE) {
     label <- spec$label; categorical <- spec$type == 'categorical'
   }
   validate(need(column %in% names(d), paste(label, 'metadata is not available yet.')))
-  d <- d[!is.na(d[[column]]) & !is.na(d$tpm) & !is.na(d$tissue), , drop = FALSE]
+  d <- d[!is.na(d[[column]]) & is.finite(d$tpm) & !is.na(d$tissue), , drop = FALSE]
   if (categorical) d <- d[d[[column]] %in% groups, , drop = FALSE]
   validate(need(nrow(d) > 0, paste('No usable expression observations for', label)))
   d$value <- d[[column]]
@@ -171,16 +180,29 @@ expression_plot <- function(d, analysis = NULL, all_tissues = TRUE) {
     d <- d[is.finite(d$value), , drop = FALSE]
     validate(need(nrow(d) > 0, 'No finite clinical measurements available.'))
     p <- ggplot(d, aes(x = value, y = log2(tpm + 1))) +
-      geom_point(color = PAL_ALS, size = 1.5, alpha = .7)
+      geom_point(color = PAL_ALS, size = 1.15, alpha = .45)
     # Fit only where a line is supported by the observed values.
     eligible <- d %>% group_by(tissue) %>%
       filter(n() >= 3, n_distinct(value) >= 2) %>% ungroup()
     if (nrow(eligible)) p <- p + geom_smooth(data = eligible, method = 'lm', formula = y ~ x,
                                              color = PAL_ACCENT, fill = PAL_ACCENT, alpha = .15, linewidth = .8)
-    if (all_tissues) p <- p + facet_wrap(~tissue, ncol = 2)
+    if (all_tissues) {
+      counts <- table(as.character(d$tissue))
+      facet_labels <- setNames(paste0(names(counts), " · n = ", as.integer(counts)), names(counts))
+      p <- p + facet_wrap(~tissue, ncol = facet_columns,
+                          scales = if (shared_y) "fixed" else "free_y",
+                          labeller = as_labeller(facet_labels))
+    }
     p <- p + labs(x = spec$axis)
   }
-  p + labs(y = 'log\u2082(TPM + 1)') + als_theme()
+  p <- p + labs(y = 'log\u2082(TPM + 1)') + als_theme()
+  if (!categorical && all_tissues) p <- p + theme(
+    strip.background = element_rect(fill = "#F4F6F9", color = NA),
+    strip.text = element_text(face = "bold", size = 11, color = PAL_TEXT, margin = margin(8, 5, 8, 5)),
+    panel.spacing = grid::unit(1.2, "lines"),
+    panel.grid.major.y = element_line(color = "#EDF0F3", linewidth = .3),
+    axis.text = element_text(size = 10), axis.title = element_text(size = 12))
+  p
 }
 
 
@@ -241,29 +263,29 @@ format_deg_number <- function(x) {
     format(signif(value, 3), scientific = abs(value) < 0.01, trim = TRUE)
   }, character(1), USE.NAMES = FALSE)
 }
-style_deg_value <- function(value, metric) {
+style_deg_value <- function(value, metric, effect_cutoff = 1) {
   text <- format_deg_number(value)
   if (metric == "log2FC") {
     color <- ifelse(is.na(value), PAL_MUTED,
-                    ifelse(value < -1, PAL_CTRL, ifelse(value > 1, PAL_ALS, PAL_MUTED)))
+                    ifelse(value < -effect_cutoff, PAL_CTRL, ifelse(value > effect_cutoff, PAL_ALS, PAL_MUTED)))
     paste0('<span style="color:', color, '">', text, '</span>')
-  } else {
+  } else if (metric %in% c("p-value", "FDR")) {
     ifelse(!is.na(value) & value < .05, paste0('<span style="font-weight:600">', text, '</span>'), text)
-  }
+  } else text
 }
-prepare_cvc_table <- function(df, mobile = FALSE) {
+prepare_cvc_table <- function(df, mobile = FALSE, effect_metric = "log2FC", effect_cutoff = 1) {
   if (mobile) {
     result <- data.frame(Tissue = df$tissue, check.names = FALSE)
     result$Tissue <- ifelse(result$Tissue %in% names(TISSUE_LABELS), TISSUE_LABELS[result$Tissue], result$Tissue)
-    result$log2FC <- style_deg_value(df$effect, "log2FC")
+    result[[effect_metric]] <- style_deg_value(df$effect, effect_metric, effect_cutoff)
     result[["p-value"]] <- style_deg_value(df$pvalue, "p-value")
     result$FDR <- style_deg_value(df$fdr, "FDR")
     return(result)
   }
-  result <- data.frame(Metric = c("log2FC", "p-value", "FDR"), check.names = FALSE)
+  result <- data.frame(Metric = c(effect_metric, "p-value", "FDR"), check.names = FALSE)
   for (i in seq_len(nrow(df))) {
     result[[as.character(df$tissue[i])]] <- c(
-      style_deg_value(df$effect[i], "log2FC"),
+      style_deg_value(df$effect[i], effect_metric, effect_cutoff),
       style_deg_value(df$pvalue[i], "p-value"),
       style_deg_value(df$fdr[i], "FDR"))
   }
@@ -761,32 +783,31 @@ ui <- fluidPage(
                     "Enter gene symbol (e.g. SOD1 )")
             ),
             div(class = "sidebar-section",
-                checkboxInput("co_all_tissues", "All Tissues", value = FALSE)
-            ),
-            div(class = "sidebar-section",
                 selectInput("co_variable", label = tags$span(class = "sidebar-label", "Analysis"),
                             choices = c("C9orf72 Status" = "c9orf72", "SOD1 Status" = "sod1",
                                         "Age at Death" = "age_at_death", "Disease Duration" = "disease_duration"),
                             selected = "c9orf72", width = "100%"),
-                conditionalPanel(condition = "!input.co_all_tissues",
-                                 selectInput("co_tissue", label = tags$span(class = "sidebar-label", "Tissue"),
-                                             choices = if (!is.null(tpm_als_only)) sort(unique(tpm_als_only$tissue)) else character(),
-                                             selected = if (!is.null(tpm_als_only) && "Cerebellum" %in% tpm_als_only$tissue) "Cerebellum" else NULL,
-                                             width = "100%"))
+                selectInput("co_tissue", label = tags$span(class = "sidebar-label", "Tissue"),
+                            choices = cvc_tissue_choices(tpm_als_only$tissue,
+                                                         unlist(lapply(case_only_data, function(x) as.character(x$tissue)), use.names = FALSE)),
+                            selected = "__all__", width = "100%")
             ),
+            conditionalPanel(
+              condition = "input.co_tissue == '__all__' && (input.co_variable == 'age_at_death' || input.co_variable == 'disease_duration')",
+              checkboxInput("co_shared_y", "Shared y-axis across tissues", value = FALSE)),
             tags$p(class = "gene-hint", "Selections update automatically."),
             div(class = "sidebar-section", style = "margin-top:26px", uiOutput("co_legend")),
             div(class = "sidebar-section",
                 tags$span(class = "sidebar-label", "Significance Thresholds"),
                 div(class = "stat-chip", "FDR < 0.05"),
-                div(class = "stat-chip", "|log\u2082FC| > 1")
+                uiOutput("co_effect_threshold")
             )
         ),
         div(class = "main-content",
             uiOutput("co_plots_ui"),
             div(class = "plot-panel",
-                div(class = "panel-title", "Differential Expression Results Across Select Clinical Variables"),
-                uiOutput("co_deg_table_ui")
+                div(class = "panel-title", textOutput("co_table_title")),
+                DTOutput("co_deg_table")
             )
         )
     )
@@ -1211,35 +1232,27 @@ server <- function(input, output, session) {
   # TAB 3 — ALS Only Analysis
   # ════════════════════════════════════════════════════════
   
-  # co_selected <- eventReactive(list(input$co_go, input$co_tissue), {
-  #   req(input$co_tissue)
-  #   list(gene = trimws(toupper(input$co_gene_input)), tissue = input$co_tissue)
-  # }, ignoreNULL = TRUE, ignoreInit = TRUE)
-  
   co_selected <- reactive({
-    if (isTRUE(input$co_all_tissues)) {
-      g <- trimws(input$co_gene_input)
-      req(g != "", g %in% all_genes)
-      req(input$co_variable)
-      list(gene = g, all_tissues = TRUE, variable = input$co_variable)
-    } else {
-      req(input$co_tissue, input$co_variable)
-      g <- trimws(input$co_gene_input)
-      req(g != "", g %in% all_genes)
-      list(gene = g, all_tissues = FALSE, tissue = input$co_tissue, variable = input$co_variable)
-    }
+    req(input$co_tissue, input$co_variable)
+    g <- trimws(input$co_gene_input)
+    req(g != "", g %in% all_genes)
+    list(gene = g, all_tissues = identical(input$co_tissue, "__all__"),
+         tissue = input$co_tissue, variable = input$co_variable)
   })
   
-  # ALS data filtered to selected gene + tissue
-  co_gene_tissue_data <- reactive({
-    sel <- co_selected()
-    req(sel$gene != "")
+  # The full expression table is scanned only when the gene changes.
+  # Returning to a recent gene reuses its small, session-local subset.
+  co_gene_data <- bindCache(reactive({
+    g <- trimws(input$co_gene_input)
+    req(g != "", g %in% all_genes)
     validate(need(!is.null(tpm_als_only), "ALS expression data is unavailable."))
-    if (isTRUE(sel$all_tissues)) {
-      dplyr::filter(tpm_als_only, gene == sel$gene)
-    } else {
-      dplyr::filter(tpm_als_only, gene == sel$gene, tissue == sel$tissue)
-    }
+    dplyr::filter(tpm_als_only, gene == g)
+  }), input$co_gene_input, cache = "session")
+  co_gene_tissue_data <- reactive({
+    req(input$co_tissue)
+    d <- co_gene_data()
+    if (identical(input$co_tissue, "__all__")) return(d)
+    dplyr::filter(d, clean_identifier(tissue) == clean_identifier(input$co_tissue))
   })
   
   output$co_legend <- renderUI({
@@ -1251,6 +1264,26 @@ server <- function(input, output, session) {
                                                     div(class = "legend-dot", style = paste0("background:", spec$colors[[group]])), group)))
   })
   
+  co_scatter_layout <- reactive({
+    sel <- co_selected()
+    spec <- ANALYSES[[sel$variable]]
+    d <- co_gene_tissue_data()
+    if (spec$column %in% names(d)) {
+      d <- d[!is.na(d[[spec$column]]) & is.finite(d$tpm) & !is.na(d$tissue), , drop = FALSE]
+    }
+    width <- session$clientData$output_co_selected_plot_width
+    if (is.null(width) || !is.finite(width) || width <= 0) width <- if (isTRUE(input$is_mobile)) 500 else 1200
+    scatter_layout(width, length(unique(d$tissue)))
+  })
+  output$co_effect_threshold <- renderUI({
+    req(input$co_variable)
+    div(class = "stat-chip", paste0("|log\u2082FC| > ", ANALYSES[[input$co_variable]]$effect_cutoff))
+  })
+  output$co_table_title <- renderText({
+    sel <- co_selected()
+    paste(ANALYSES[[sel$variable]]$label, "— DEG results —",
+          if (isTRUE(sel$all_tissues)) "All tissues" else sel$tissue)
+  })
   co_selected_plot <- reactive({
     sel <- co_selected()
     d <- co_gene_tissue_data()
@@ -1261,22 +1294,35 @@ server <- function(input, output, session) {
       d$sod1 <- ifelse(value %in% c("1", "true", "yes", "+", "positive", "sod1+", "sod1 +"), "SOD1 +",
                        ifelse(value %in% c("0", "false", "no", "-", "negative", "sod1-", "sod1 -"), "SOD1 -", NA_character_))
     }
-    expression_plot(d, analysis = sel$variable, all_tissues = sel$all_tissues)
+    expression_plot(d, analysis = sel$variable, all_tissues = sel$all_tissues,
+                    shared_y = isTRUE(input$co_shared_y), facet_columns = co_scatter_layout()$columns)
   })
-  output$co_selected_plot <- renderPlot(co_selected_plot(), bg = PAL_PANEL)
+  output$co_selected_plot <- bindCache(renderPlot(co_selected_plot(), bg = PAL_PANEL),
+                                       input$co_gene_input, input$co_tissue, input$co_variable, isTRUE(input$co_shared_y),
+                                       co_scatter_layout()$columns, cache = "session")
   output$co_selected_plot_title <- renderText({
     sel <- co_selected()
     paste(sel$gene, "\u2014", ANALYSES[[sel$variable]]$label, "\u2014",
           if (isTRUE(sel$all_tissues)) "Across All Tissues" else sel$tissue)
   })
-  output$co_plots_ui <- renderUI({
-    sel <- co_selected()
-    div(class = "plot-panel",
-        div(class = "panel-title", textOutput("co_selected_plot_title")),
-        plotOutput("co_selected_plot", height = if (isTRUE(sel$all_tissues) && ANALYSES[[sel$variable]]$type == "continuous") "600px" else "380px"),
-        tags$p(class = "gene-hint", "Observed bulk expression. Scatterplot lines are descriptive fits; DEG statistics come from the fitted analysis model."),
-        div(style = "text-align:right;", downloadButton("download_co_selected", "Download Plot", class = "btn-download")))
+  co_plot_height <- reactive({
+    if (identical(input$co_tissue, "__all__") &&
+        input$co_variable %in% c("age_at_death", "disease_duration"))
+      paste0(co_scatter_layout()$height, "px") else "380px"
   })
+  output$co_plots_ui <- bindCache(renderUI({
+    all_tissues <- identical(input$co_tissue, "__all__")
+    expression_panel <- div(class = "plot-panel",
+                            div(class = "panel-title", textOutput("co_selected_plot_title")),
+                            plotOutput("co_selected_plot", height = co_plot_height()),
+                            div(style = "text-align:right;", downloadButton("download_co_selected", "Download Plot", class = "btn-download")))
+    if (all_tissues) return(div(class = "cvc-plots single", expression_panel))
+    div(class = "cvc-plots", expression_panel,
+        div(class = "plot-panel",
+            div(class = "panel-title", "Volcano Plot — ALS Only"),
+            plotOutput("co_volcano_plot", height = "380px"),
+            div(style = "text-align:right;", downloadButton("download_co_volcano", "Download Plot", class = "btn-download"))))
+  }), identical(input$co_tissue, "__all__"), co_plot_height(), cache = "session")
   output$download_co_selected <- downloadHandler(
     filename = function() {
       sel <- co_selected()
@@ -1285,158 +1331,99 @@ server <- function(input, output, session) {
     content = function(file) {
       sel <- co_selected()
       ggsave(file, plot = co_selected_plot(), width = 12,
-             height = if (isTRUE(sel$all_tissues) && ANALYSES[[sel$variable]]$type == "continuous") 8 else 6,
+             height = if (isTRUE(sel$all_tissues) && ANALYSES[[sel$variable]]$type == "continuous") max(5, co_scatter_layout()$height / 90) else 6,
              dpi = 300, device = "png")
     })
   
-  # ── ALS-only DEG table ──────────────────────────────────
-  output$co_deg_table_ui <- renderUI({
-    g <- trimws(input$co_gene_input)
-    if (g == "" || length(case_only_data) == 0)
-      return(div(class = "empty-state",
-                 div(class = "es-icon", "\U0001f4cb"),
-                 tags$p("Select a gene to see DEG results")))
-    DTOutput("co_deg_table")
+  # Lazy per-analysis caches: selecting one analysis does not normalize the others.
+  co_results_cache <- setNames(lapply(names(ANALYSES), function(nm) {
+    analysis <- nm
+    reactive({
+      raw <- case_only_data[[analysis]]
+      if (is.null(raw)) return(list(data = NULL, message = "Results not available yet"))
+      tryCatch(list(data = normalize_deg(raw), message = NULL),
+               error = function(e) list(data = NULL, message = conditionMessage(e)))
+    })
+  }), names(ANALYSES))
+  co_analysis_results <- reactive({
+    req(input$co_variable)
+    entry <- co_results_cache[[input$co_variable]]()
+    validate(need(!is.null(entry$data), paste(ANALYSES[[input$co_variable]]$label, "—", entry$message)))
+    entry$data
   })
-  
-  output$co_deg_table <- renderDT({
+  co_volcano_data <- reactive({
+    req(input$co_tissue, input$co_tissue != "__all__", input$co_variable)
+    df <- co_analysis_results()
+    df <- df[df$tissue == clean_identifier(input$co_tissue) & is.finite(df$effect) &
+               is.finite(df$fdr) & df$fdr >= 0 & df$fdr <= 1, , drop = FALSE]
+    validate(need(nrow(df) > 0, "No usable DEG effects/FDR values for this analysis and tissue."))
+    positive <- df$fdr[df$fdr > 0]
+    floor_value <- if (length(positive)) max(min(positive) / 10, .Machine$double.xmin) else .Machine$double.xmin
+    df$minus_log10_fdr <- -log10(pmax(df$fdr, floor_value))
+    cutoff <- ANALYSES[[input$co_variable]]$effect_cutoff
+    significant <- df$fdr < .05 & abs(df$effect) > cutoff
+    df$status <- ifelse(significant & df$effect > 0, "Positive effect",
+                        ifelse(significant & df$effect < 0, "Negative effect", "Below thresholds"))
+    df
+  })
+  co_volcano_plot <- reactive({
     sel <- co_selected()
-    req(sel$gene != "", length(case_only_data) > 0)
-    g <- sel$gene
-    
-    if (isTRUE(sel$all_tissues)) {
-      # ── CASE 1: All Tissues ──
-      df <- case_only_data[[sel$variable]]
-      validate(need(!is.null(df), "No data for this variable."))
-      df <- data.frame(df)
-      
-      tbl_base <- df %>%
-        dplyr::filter(.data$symbol == .env$g) %>%
-        dplyr::select(
-          Tissue    = tissue,
-          `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
-          `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
-          `FDR`     = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
-        ) %>%
-        dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 3)))
-      
-      validate(need(nrow(tbl_base) > 0, paste0("'", g, "' not found in DEG results for ", sel$variable, ".")))
-      
-      if (isTRUE(input$is_mobile)) {
-        t_map <- c("Cerebellum" = "CBL", 
-                   "Lumbar Spinal Cord" = "LSC", 
-                   "Cervical Spinal Cord" = "CSC", 
-                   "Frontal Cortex" = "FCX", 
-                   "Motor Cortex" = "MCX")
-        
-        tbl_display <- tbl_base %>%
-          dplyr::mutate(Tissue = ifelse(as.character(Tissue) %in% names(t_map), 
-                                        t_map[as.character(Tissue)], 
-                                        as.character(Tissue))) %>%
-          dplyr::mutate(
-            log2FC = {
-              val <- suppressWarnings(as.numeric(log2FC))
-              dplyr::case_when(
-                !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
-                !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
-                !is.na(val)            ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
-                TRUE ~ as.character(val)
-              )
-            },
-            `p-value` = {
-              val <- suppressWarnings(as.numeric(`p-value`))
-              dplyr::case_when(
-                !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
-                TRUE ~ as.character(val)
-              )
-            },
-            FDR = {
-              val <- suppressWarnings(as.numeric(FDR))
-              dplyr::case_when(
-                !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
-                TRUE ~ as.character(val)
-              )
-            }
-          ) %>%
-          dplyr::rename(` ` = Tissue)
-        
-        col_targets <- seq_len(ncol(tbl_display) - 1)
-        
-      } else {
-        tbl <- tbl_base %>%
-          tidyr::pivot_longer(cols = -Tissue, names_to = "Metric", values_to = "Value") %>%
-          tidyr::pivot_wider(names_from = Tissue, values_from = Value) %>%
-          dplyr::rename(` ` = Metric)
-        
-        tissue_cols <- setdiff(colnames(tbl), " ")
-        
-        tbl_display <- tbl %>%
-          dplyr::mutate(dplyr::across(dplyr::all_of(tissue_cols), ~ {
-            val   <- suppressWarnings(as.numeric(.x))
-            label <- tbl[[" "]][row_number()]
-            dplyr::case_when(
-              label == "log2FC" & !is.na(val) & val < -1 ~ paste0('<span style="color:', PAL_CTRL, '">', val, '</span>'),
-              label == "log2FC" & !is.na(val) & val >  1 ~ paste0('<span style="color:', PAL_ALS,  '">', val, '</span>'),
-              label == "log2FC" & !is.na(val) ~ paste0('<span style="color:', PAL_MUTED, '">', val, '</span>'),
-              (label == "FDR" | label == "p-value") & !is.na(val) & val < 0.05 ~ paste0('<span style="font-weight:600">', val, '</span>'),
-              TRUE ~ as.character(val)
-            )
-          }))
-        
-        col_targets <- seq_len(ncol(tbl_display) - 1)
-      }
-      
-      datatable(tbl_display, rownames = FALSE, escape = FALSE, width = "100%",
-                options = list(dom = "t", 
-                               ordering = FALSE,
-                               scrollX   = FALSE,
-                               columnDefs = list(list(className = "dt-center", targets = col_targets))),
-                class = "display compact")
-      
-    } else {
-      # ── CASE 2: Single Tissue ──
-      t <- sel$tissue
-      
-      pull_tbl <- function(nm, label) {
-        df <- case_only_data[[nm]]
-        if (is.null(df)) return(data.frame(Analysis = paste0(label, " (not available yet)"),
-                                           log2FC = NA_real_, `p-value` = NA_real_, FDR = NA_real_, check.names = FALSE))
-        df <- data.frame(df)
-        
-        df %>%
-          dplyr::filter(.data$symbol == .env$g, .data$tissue == .env$t) %>%
-          dplyr::select(
-            `log2FC`  = dplyr::any_of(c("log2FoldChange", "logFC", "LFC")),
-            `p-value` = dplyr::any_of(c("pvalue", "PValue", "pval", "P.Value")),
-            `FDR`     = dplyr::any_of(c("padj", "FDR", "adj.P.Val", "p.adjust"))
-          ) %>%
-          dplyr::mutate(Analysis = label, .before = 1) %>%
-          dplyr::mutate(dplyr::across(where(is.numeric), ~ signif(.x, 4)))
-      }
-      
-      tbl <- dplyr::bind_rows(
-        pull_tbl("c9orf72",          "C9orf72 Status"),
-        pull_tbl("sod1",             "SOD1 Status"),
-        pull_tbl("age_at_death",     "Age at Death"),
-        pull_tbl("disease_duration", "Disease Duration")
-      )
-      
-      validate(need(nrow(tbl) > 0,
-                    paste0("'", g, "' not found in ALS-only DEG results for ", t, ".")))
-      
-      datatable(tbl, rownames = FALSE, width = "100%",
-                options = list(dom = "t", ordering = FALSE,
-                               scrollX   = FALSE,
-                               columnDefs = list(list(className = "dt-center", targets = 1:3))),
-                class = "display compact") %>%
-        formatStyle("FDR",
-                    color      = styleInterval(c(0.05), c("#1A7A4A", PAL_MUTED)),
-                    fontWeight = styleInterval(c(0.05), c("600", "normal"))) %>%
-        formatStyle("log2FC",
-                    color = styleInterval(c(-1, 1), c(PAL_CTRL, PAL_MUTED, PAL_ALS)))
-    }
+    spec <- ANALYSES[[sel$variable]]
+    df <- co_volcano_data()
+    chosen <- df[df$gene == sel$gene, , drop = FALSE]
+    categorical <- spec$type == "categorical"
+    p <- ggplot(df, aes(x = effect, y = minus_log10_fdr, color = status)) +
+      geom_point(alpha = .65, size = 1.5) +
+      geom_hline(yintercept = -log10(.05), linetype = "dashed", color = PAL_MUTED, linewidth = .4) +
+      scale_color_manual(values = c("Positive effect" = PAL_ALS, "Negative effect" = PAL_CTRL, "Below thresholds" = "#B5B9BE")) +
+      labs(x = "log2 fold change",
+           y = "-log10(FDR)", color = NULL, subtitle = paste(sel$tissue, "—", spec$label)) +
+      als_theme() + theme(legend.text = element_text(size = 10), legend.position = "bottom",
+                          plot.subtitle = element_text(size = 11))
+    p <- p + geom_vline(xintercept = c(-spec$effect_cutoff, spec$effect_cutoff), linetype = "dashed", color = PAL_MUTED, linewidth = .4)
+    if (nrow(chosen)) p <- p +
+      geom_point(data = chosen, shape = 21, fill = "#F4D03F", color = "black", size = 3, stroke = 1) +
+      geom_text(data = chosen, aes(label = gene), color = PAL_TEXT, vjust = -1, size = 3.5, show.legend = FALSE) +
+      scale_y_continuous(expand = expansion(mult = c(.03, .15)))
+    p
   })
+  output$co_volcano_plot <- bindCache(renderPlot(co_volcano_plot(), bg = PAL_PANEL),
+                                      input$co_gene_input, input$co_tissue, input$co_variable, cache = "session")
+  output$download_co_volcano <- downloadHandler(
+    filename = function() {
+      sel <- co_selected()
+      paste0(gsub(" ", "_", sel$tissue), "_", sel$variable, "_volcano.png")
+    },
+    content = function(file) ggsave(file, plot = co_volcano_plot(), width = 8, height = 6, dpi = 300, device = "png"))
+  
+  # Both tissue modes show only the selected analysis.
+  co_table_data <- reactive({
+    sel <- co_selected()
+    df <- co_analysis_results()
+    df <- df[df$gene == sel$gene, , drop = FALSE]
+    if (!isTRUE(sel$all_tissues)) df <- df[df$tissue == clean_identifier(sel$tissue), , drop = FALSE]
+    validate(need(nrow(df) > 0, "No results for this gene/tissue in the selected analysis."))
+    validate(need(!anyDuplicated(df$tissue), "Multiple distinct DEG rows match this symbol in one tissue; resolve the gene identifiers in the input results."))
+    display <- prepare_cvc_table(df, mobile = isTRUE(input$is_mobile), effect_metric = "log2FC",
+                                 effect_cutoff = ANALYSES[[sel$variable]]$effect_cutoff)
+    # Keep single-tissue column identifiers stable across tissue switches.
+    # Only the visible header changes to the selected tissue name.
+    if (!isTRUE(sel$all_tissues) && !isTRUE(input$is_mobile)) names(display)[2] <- "Value"
+    display
+  })
+  output$co_deg_table <- renderDT({
+    display <- co_table_data()
+    sel <- co_selected()
+    display_headers <- names(display)
+    if (!isTRUE(sel$all_tissues) && !isTRUE(input$is_mobile)) display_headers[2] <- sel$tissue
+    # Escape metadata columns; only numeric effect/statistic cells contain HTML.
+    text_cols <- which(names(display) %in% c("Analysis", "Effect type", "Availability", "Metric", "Tissue"))
+    datatable(display, colnames = display_headers, rownames = FALSE, escape = text_cols, width = "100%",
+              options = list(dom = "t", ordering = FALSE, scrollX = TRUE, stateSave = FALSE,
+                             columnDefs = list(list(className = "dt-center", targets = seq_len(ncol(display) - 1)))),
+              class = "display compact")
+  }, server = FALSE) # Small summary tables need no server-side DataTables queries.
+  
 }
 
 shinyApp(ui = ui, server = server)
-
